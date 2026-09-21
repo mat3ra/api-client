@@ -1,9 +1,9 @@
 from .entity import EntityEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
-from .mixins.set import EntitySetEndpointsMixin
+from .mixins.set import EntitySetEndpointsMixin, EntitySetUpdateEndpointsMixin
 
 
-class MeasurementEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
+class MeasurementEndpoints(EntitySetEndpointsMixin, EntitySetUpdateEndpointsMixin, EntityEndpoint):
     """
     Measurement endpoints.
 

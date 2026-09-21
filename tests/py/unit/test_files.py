@@ -10,6 +10,7 @@ from mat3ra.api_client.endpoints.files import FileEndpoints
 from tests.py.unit import EndpointBaseUnitTest
 
 FILE_NAME = "loops/site-1.npy"
+STORED_KEY = "user-rvuo7pgiyu/loops/site-1.npy"
 FILE_CONTENT = b"loop data"
 FILE_SHA256 = "61719738f7cfbd0bb8e7fc91cbd2febe3b90732b4f31a994babf549e44537de8"
 SIGNED_URL = "https://test-bucket.s3.amazonaws.com/user-rvuo7pgiyu/loops/site-1.npy?X-Amz-Signature=test"
@@ -17,9 +18,7 @@ OTHER_ACCOUNT_ID = "5dJXaqqhjPZrA5Qyw"
 
 MOCK_CREATED_FILE = {"name": "record.json", "key": "user-rvuo7pgiyu/record.json", "size": 2}
 MOCK_CREATE_RESPONSE = json.dumps({"status": "success", "data": MOCK_CREATED_FILE})
-MOCK_SIGNED_URLS_RESPONSE = json.dumps(
-    {"status": "success", "data": [{"key": "user-rvuo7pgiyu/loops/site-1.npy", "signedUrl": SIGNED_URL}]}
-)
+MOCK_SIGNED_URLS_RESPONSE = json.dumps({"status": "success", "data": [{"key": STORED_KEY, "signedUrl": SIGNED_URL}]})
 MOCK_REFUSED_RESPONSE = "<Error><Code>AccessDenied</Code></Error>"
 
 
@@ -58,7 +57,7 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
             with open(path, "wb") as file_:
                 file_.write(FILE_CONTENT)
             result = self.endpoints.put(path, FILE_NAME)
-        self.assertEqual(result, {"key": FILE_NAME, "bytes": len(FILE_CONTENT), "sha256": FILE_SHA256})
+        self.assertEqual(result, {"key": STORED_KEY, "bytes": len(FILE_CONTENT), "sha256": FILE_SHA256})
         self.assertEqual(
             json.loads(mock_request.call_args[1]["data"]), {"names": [FILE_NAME], "operation": "putObject"}
         )
@@ -85,7 +84,8 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
             path = os.path.join(directory, "site-1.npy")
             with open(path, "wb") as file_:
                 file_.write(FILE_CONTENT)
-            self.endpoints.put(path, FILE_NAME, OTHER_ACCOUNT_ID)
+            result = self.endpoints.put(path, FILE_NAME, OTHER_ACCOUNT_ID)
+        self.assertEqual(result["key"], STORED_KEY)
         self.assertEqual(json.loads(mock_request.call_args[1]["data"])["accountId"], OTHER_ACCOUNT_ID)
 
     @mock.patch("requests.put")

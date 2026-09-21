@@ -75,11 +75,11 @@ class FileEndpoints(BaseEndpoint):
             account_id (str): account to act under. The caller's default account is used if not specified.
 
         Returns:
-            dict: {"key": str, "bytes": int, "sha256": str}
+            dict: {"key": str, "bytes": int, "sha256": str} with the key the file is stored under.
         """
-        url = self.signed_urls([key], "putObject", account_id)[0]["signedUrl"]
+        signed_file = self.signed_urls([key], "putObject", account_id)[0]
         with open(path, "rb") as file_:
             content = file_.read()
-        response = requests.put(url, data=content)
+        response = requests.put(signed_file["signedUrl"], data=content)
         response.raise_for_status()
-        return {"key": key, "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+        return {"key": signed_file["key"], "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
