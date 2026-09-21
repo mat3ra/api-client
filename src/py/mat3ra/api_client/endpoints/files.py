@@ -73,5 +73,6 @@ class FileEndpoints(BaseEndpoint):
         url = self.signed_urls([key], "putObject")[0]["signedUrl"]
         with open(path, "rb") as file_:
             content = file_.read()
-        requests.put(url, data=content)
+        response = requests.put(url, data=content)
+        response.raise_for_status()
         return {"key": key, "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}

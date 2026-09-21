@@ -3,6 +3,9 @@ import os
 import tempfile
 from unittest import mock
 
+import pytest
+import requests
+
 from mat3ra.api_client.endpoints.files import FileEndpoints
 from tests.py.unit import EndpointBaseUnitTest
 
@@ -16,6 +19,7 @@ MOCK_CREATE_RESPONSE = json.dumps({"status": "success", "data": MOCK_CREATED_FIL
 MOCK_SIGNED_URLS_RESPONSE = json.dumps(
     {"status": "success", "data": [{"key": "user-rvuo7pgiyu/loops/site-1.npy", "signedUrl": SIGNED_URL}]}
 )
+MOCK_REFUSED_RESPONSE = "<Error><Code>AccessDenied</Code></Error>"
 
 
 class EndpointFilesUnitTest(EndpointBaseUnitTest):
@@ -57,3 +61,15 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
         self.assertEqual(json.loads(mock_request.call_args[1]["data"])["operation"], "putObject")
         self.assertEqual(mock_put.call_args[0][0], SIGNED_URL)
         self.assertEqual(mock_put.call_args[1]["data"], FILE_CONTENT)
+
+    @mock.patch("requests.put")
+    @mock.patch("requests.sessions.Session.request")
+    def test_put_refused(self, mock_request, mock_put):
+        mock_request.return_value = self.mock_response(MOCK_SIGNED_URLS_RESPONSE)
+        mock_put.return_value = self.mock_response(MOCK_REFUSED_RESPONSE, 403, "Forbidden")
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "site-1.npy")
+            with open(path, "wb") as file_:
+                file_.write(FILE_CONTENT)
+            with pytest.raises(requests.HTTPError):
+                self.endpoints.put(path, FILE_NAME)
