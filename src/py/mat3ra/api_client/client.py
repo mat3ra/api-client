@@ -152,6 +152,7 @@ class APIClient(BaseModel):
             {
                 "_id": account["entity"]["_id"],
                 "name": account["entity"].get("name", ""),
+                "slug": account["entity"].get("slug", ""),
                 "type": account["entity"].get("type", "personal"),
                 "isDefault": account.get("isDefault", False),
             }
