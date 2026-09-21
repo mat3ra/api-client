@@ -24,15 +24,20 @@ ACCOUNTS_RESPONSE = {
         },
         "accounts": [
             {
-                "entity": {"_id": "user-acc-1", "name": "John Doe", "type": "personal"},
+                "entity": {"_id": "user-acc-1", "name": "John Doe", "slug": "john-doe", "type": "personal"},
                 "isDefault": True,
             },
             {
-                "entity": {"_id": "org-acc-1", "name": "Acme Corp", "type": "enterprise"},
+                "entity": {"_id": "org-acc-1", "name": "Acme Corp", "slug": "acme-corp", "type": "enterprise"},
                 "isDefault": True,
             },
             {
-                "entity": {"_id": "org-acc-2", "name": "Beta Industries", "type": "organization"},
+                "entity": {
+                    "_id": "org-acc-2",
+                    "name": "Beta Industries",
+                    "slug": "beta-industries",
+                    "type": "organization",
+                },
                 "isDefault": False,
             },
         ],
@@ -113,10 +118,12 @@ class APIClientUnitTest(EndpointBaseUnitTest):
             self.assertEqual(len(accounts), 3)
             self.assertEqual(accounts[0]["_id"], "user-acc-1")
             self.assertEqual(accounts[0]["name"], "John Doe")
+            self.assertEqual(accounts[0]["slug"], "john-doe")
             self.assertEqual(accounts[0]["type"], "personal")
             self.assertTrue(accounts[0]["isDefault"])
             self.assertEqual(accounts[1]["_id"], "org-acc-1")
             self.assertEqual(accounts[1]["name"], "Acme Corp")
+            self.assertEqual(accounts[1]["slug"], "acme-corp")
             self.assertEqual(accounts[1]["type"], "enterprise")
 
     @mock.patch("requests.get")

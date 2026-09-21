@@ -9,11 +9,14 @@ from .constants import ACCESS_TOKEN_ENV_VAR, _build_base_url
 from .endpoints.bank_materials import BankMaterialEndpoints
 from .endpoints.bank_workflows import BankWorkflowEndpoints
 from .endpoints.clusters import ClustersEndpoint
+from .endpoints.files import FileEndpoints
 from .endpoints.jobs import JobEndpoints
 from .endpoints.materials import MaterialEndpoints
+from .endpoints.measurements import MeasurementEndpoints
 from .endpoints.metaproperties import MetaPropertiesEndpoints
 from .endpoints.projects import ProjectEndpoints
 from .endpoints.properties import PropertiesEndpoints
+from .endpoints.samples import SampleEndpoints
 from .endpoints.workflows import WorkflowEndpoints
 from .models import Account, APIEnv, AuthContext, AuthEnv
 
@@ -53,6 +56,9 @@ class APIClient(BaseModel):
         base_kwargs = {"version": self.version, "secure": self.secure, "timeout": timeout_seconds, "auth": self.auth}
 
         self.materials = MaterialEndpoints(*base_args, **base_kwargs)
+        self.samples = SampleEndpoints(*base_args, **base_kwargs)
+        self.measurements = MeasurementEndpoints(*base_args, **base_kwargs)
+        self.files = FileEndpoints(*base_args, **base_kwargs)
         self.workflows = WorkflowEndpoints(*base_args, **base_kwargs)
         self.jobs = JobEndpoints(*base_args, **base_kwargs)
         self.projects = ProjectEndpoints(*base_args, **base_kwargs)
@@ -146,6 +152,7 @@ class APIClient(BaseModel):
             {
                 "_id": account["entity"]["_id"],
                 "name": account["entity"].get("name", ""),
+                "slug": account["entity"].get("slug", ""),
                 "type": account["entity"].get("type", "personal"),
                 "isDefault": account.get("isDefault", False),
             }

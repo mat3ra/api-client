@@ -30,3 +30,23 @@ class EntitySetEndpointsMixin(object):
         """
         params = {"oldSetId": old_set_id, "newSetId": new_set_id}
         self.request("POST", "/".join((self.name, _id, "move-to-set")), params=params, headers=self.headers)
+
+
+class EntitySetUpdateEndpointsMixin(object):
+    """
+    Entity Set update endpoints mixin.
+    """
+
+    def update_set(self, _id, config):
+        """
+        Updates a entity set with given ID.
+
+        Args:
+            _id (str): entity set ID.
+            config (dict): entity set config.
+
+        Returns:
+             dict: updated entity set.
+        """
+        path_ = "/".join((self.name, _id, "update-set"))
+        return self.request("PUT", path_, data=json.dumps(config), headers=self.headers)
