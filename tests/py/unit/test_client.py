@@ -14,6 +14,14 @@ OIDC_ACCESS_TOKEN = "oidc-access-token"
 AUTH_TOKEN = "legacy-auth-token"
 ACCOUNT_ID = "ubxMkAyx37Rjn8qK9"
 
+AUTH_ENV_AND_USERS_ME_HEADERS = [
+    ({"OIDC_ACCESS_TOKEN": OIDC_ACCESS_TOKEN}, {"Authorization": f"Bearer {OIDC_ACCESS_TOKEN}"}),
+    (
+        {"ACCOUNT_ID": ACCOUNT_ID, "AUTH_TOKEN": AUTH_TOKEN},
+        {"X-Account-Id": ACCOUNT_ID, "X-Auth-Token": AUTH_TOKEN},
+    ),
+]
+
 ME_ACCOUNT_ID = "my-account-id"
 USERS_ME_RESPONSE = {"data": {"user": {"entity": {"defaultAccountId": ME_ACCOUNT_ID}}}}
 
@@ -104,20 +112,22 @@ class APIClientUnitTest(EndpointBaseUnitTest):
 
     @mock.patch("requests.get")
     def test_list_accounts(self, mock_get):
-        env = self._base_env() | {"OIDC_ACCESS_TOKEN": OIDC_ACCESS_TOKEN}
-        with mock.patch.dict("os.environ", env, clear=True):
-            self._mock_users_me(mock_get, ACCOUNTS_RESPONSE)
-            client = APIClient.authenticate()
-            accounts = client.list_accounts()
+        for auth_env, expected_headers in AUTH_ENV_AND_USERS_ME_HEADERS:
+            with self.subTest(auth_env=auth_env), mock.patch.dict(
+                "os.environ", self._base_env() | auth_env, clear=True
+            ):
+                self._mock_users_me(mock_get, ACCOUNTS_RESPONSE)
+                accounts = APIClient.authenticate().list_accounts()
 
-            self.assertEqual(len(accounts), 3)
-            self.assertEqual(accounts[0]["_id"], "user-acc-1")
-            self.assertEqual(accounts[0]["name"], "John Doe")
-            self.assertEqual(accounts[0]["type"], "personal")
-            self.assertTrue(accounts[0]["isDefault"])
-            self.assertEqual(accounts[1]["_id"], "org-acc-1")
-            self.assertEqual(accounts[1]["name"], "Acme Corp")
-            self.assertEqual(accounts[1]["type"], "enterprise")
+                self.assertEqual(mock_get.call_args[1]["headers"], expected_headers)
+                self.assertEqual(len(accounts), 3)
+                self.assertEqual(accounts[0]["_id"], "user-acc-1")
+                self.assertEqual(accounts[0]["name"], "John Doe")
+                self.assertEqual(accounts[0]["type"], "personal")
+                self.assertTrue(accounts[0]["isDefault"])
+                self.assertEqual(accounts[1]["_id"], "org-acc-1")
+                self.assertEqual(accounts[1]["name"], "Acme Corp")
+                self.assertEqual(accounts[1]["type"], "enterprise")
 
     @mock.patch("requests.get")
     def test_get_account(self, mock_get):
