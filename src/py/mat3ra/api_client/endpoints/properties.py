@@ -1,5 +1,6 @@
 from .entity import EntityEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
+from ..utils.query import PAGINATION_PARAMETERS
 
 
 class BasePropertiesEndpoints(EntityEndpoint):
@@ -41,6 +42,41 @@ class PropertiesEndpoints(BasePropertiesEndpoints):
         auth_token (str): authentication token.
         headers (dict): default HTTP headers.
     """
+
+    list_parameters = (
+        "id",
+        "ownerId",
+        "ownerSlug",
+        "sharedWithAccountId",
+        "sharedWithAccountSlug",
+        "accountSlug",
+        "quickSearch",
+        "name",
+        "propertyName",
+        "repetition",
+        "slug",
+        "group",
+        "groupPrefix",
+        "exabyteId",
+        "jobId",
+        "unitId",
+        "precisionValue",
+        "systemTags",
+        *PAGINATION_PARAMETERS,
+    )
+    query_fields = {
+        "_id": "id",
+        "owner._id": "ownerId",
+        "owner.slug": "ownerSlug",
+        "name": "name",
+        "slug": "slug",
+        "exabyteId": "exabyteId",
+        "group": "group",
+        "source.info.jobId": "jobId",
+        "source.info.unitId": "unitId",
+        "data.name": "propertyName",
+        "precision.value": "precisionValue",
+    }
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(PropertiesEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)

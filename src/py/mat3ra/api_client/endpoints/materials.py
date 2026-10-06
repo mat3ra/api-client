@@ -5,6 +5,7 @@ from ..utils.http import BaseConnection
 from .mixins.default import DefaultableEntityEndpointsMixin
 from .mixins.set import EntitySetEndpointsMixin
 from ..utils.materials import get_materialsproject_url
+from ..utils.query import OWNED_ENTITY_QUERY_FIELDS, PAGINATION_PARAMETERS
 
 
 class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin, EntityEndpoint):
@@ -24,6 +25,39 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
     Attributes:
         name (str): endpoint name.
     """
+
+    list_parameters = (
+        "id",
+        "name",
+        "ownerId",
+        "ownerSlug",
+        "teamId",
+        "sharedWithAccountId",
+        "sharedWithAccountSlug",
+        "setId",
+        "notSetId",
+        "isDefault",
+        "formula",
+        "hashes",
+        "srcHashes",
+        "scaledHashes",
+        "tags",
+        "metadataElement",
+        "withProperties",
+        "isEntitySet",
+        "globalSearch",
+        "quickSearch",
+        *PAGINATION_PARAMETERS,
+    )
+    query_fields = {
+        **OWNED_ENTITY_QUERY_FIELDS,
+        "isEntitySet": "isEntitySet",
+        "inSet._id": "setId",
+        "formula": "formula",
+        "hash": "hashes",
+        "scaledHash": "scaledHashes",
+        "tags": "tags",
+    }
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(MaterialEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)

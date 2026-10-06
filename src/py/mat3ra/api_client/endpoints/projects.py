@@ -1,6 +1,7 @@
 from .entity import EntityEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
 from .mixins.default import DefaultableEntityEndpointsMixin
+from ..utils.query import OWNED_ENTITY_QUERY_FIELDS, PAGINATION_PARAMETERS
 
 
 class ProjectEndpoints(DefaultableEntityEndpointsMixin, EntityEndpoint):
@@ -23,6 +24,19 @@ class ProjectEndpoints(DefaultableEntityEndpointsMixin, EntityEndpoint):
         auth_token (str): authentication token.
         headers (dict): default HTTP headers.
     """
+
+    list_parameters = (
+        "id",
+        "ownerId",
+        "ownerSlug",
+        "teamId",
+        "isDefault",
+        "sharedWithAccountId",
+        "sharedWithAccountSlug",
+        "quickSearch",
+        *PAGINATION_PARAMETERS,
+    )
+    query_fields = OWNED_ENTITY_QUERY_FIELDS
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(ProjectEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)

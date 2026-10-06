@@ -84,3 +84,21 @@ class EndpointCharacteristicUnitTest(EntityEndpointsUnitTest):
         sent_query = json.loads(mock_request.call_args[1]["params"]["query"])
         self.assertEqual(sent_query["source.info.unitId"], UNIT_ID_1)
         self.assertEqual(sent_query["data.name"], PROPERTY_NAME_1)
+
+    @mock.patch("requests.sessions.Session.request")
+    def test_get_for_job_sends_flat_filters(self, mock_request):
+        mock_request.return_value = self.mock_response(MOCK_SINGLE_PROPERTY_RESPONSE)
+        self.endpoints.get_for_job(JOB_ID, PROPERTY_NAME_1, unit_id=UNIT_ID_1)
+        params = mock_request.call_args[1]["params"]
+        self.assertEqual(
+            (params["jobId"], params["propertyName"], params["unitId"]), (JOB_ID, PROPERTY_NAME_1, UNIT_ID_1)
+        )
+
+    @mock.patch("requests.sessions.Session.request")
+    def test_get_property_sends_flat_filters(self, mock_request):
+        mock_request.return_value = self.mock_response(MOCK_PROPERTIES_RESPONSE)
+        self.endpoints.get_property(JOB_ID, UNIT_ID_1, PROPERTY_NAME_1)
+        params = mock_request.call_args[1]["params"]
+        self.assertEqual(
+            (params["jobId"], params["propertyName"], params["unitId"]), (JOB_ID, PROPERTY_NAME_1, UNIT_ID_1)
+        )

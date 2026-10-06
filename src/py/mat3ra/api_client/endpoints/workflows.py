@@ -1,6 +1,7 @@
 from .entity import EntityEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
 from .mixins.default import DefaultableEntityEndpointsMixin
+from ..utils.query import OWNED_ENTITY_QUERY_FIELDS, PAGINATION_PARAMETERS
 
 
 class WorkflowEndpoints(DefaultableEntityEndpointsMixin, EntityEndpoint):
@@ -23,6 +24,30 @@ class WorkflowEndpoints(DefaultableEntityEndpointsMixin, EntityEndpoint):
         auth_token (str): authentication token.
         headers (dict): default HTTP headers.
     """
+
+    list_parameters = (
+        "id",
+        "hash",
+        "name",
+        "applicationName",
+        "ownerId",
+        "ownerSlug",
+        "teamId",
+        "sharedWithAccountId",
+        "sharedWithAccountSlug",
+        "accountSlug",
+        "setId",
+        "globalSearch",
+        "quickSearch",
+        "isDefault",
+        *PAGINATION_PARAMETERS,
+    )
+    query_fields = {
+        **OWNED_ENTITY_QUERY_FIELDS,
+        "inSet._id": "setId",
+        "hash": "hash",
+        "application.name": "applicationName",
+    }
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(WorkflowEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
