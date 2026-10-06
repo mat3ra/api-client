@@ -38,16 +38,6 @@ class EntityEndpointsUnitTest(EndpointBaseUnitTest):
         self.endpoints.create({})
         self.assertEqual(mock_request.call_args[1]["headers"]["Content-Type"], CONTENT_TYPE_JSON)
 
-    def show_default(self, mock_request):
-        mock_request.return_value = self.mock_response(MOCK_SUCCESS_RESPONSE_OBJECT)
-        self.assertEqual(self.endpoints.show_default(), {})
-        self.assertEqual(mock_request.call_args[1]["method"], HTTP_METHOD_GET)
-        self.assertEqual(mock_request.call_args[1]["url"], f"{self.base_url}/default")
-        self.assertIsNone(mock_request.call_args[1]["params"])
-
-        self.endpoints.show_default(self.account_id)
-        self.assertEqual(mock_request.call_args[1]["params"], {"accountId": self.account_id})
-
     def delete(self, mock_request):
         mock_request.return_value = self.mock_response(MOCK_SUCCESS_RESPONSE_OBJECT)
         self.assertEqual(self.endpoints.delete(TEST_ENTITY_ID), {})

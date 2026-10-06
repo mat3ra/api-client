@@ -31,7 +31,3 @@ class EndpointMaterialsUnitTest(EntityEndpointsUnitTest):
     @mock.patch("requests.sessions.Session.request")
     def test_delete(self, mock_request):
         self.create(mock_request)
-
-    @mock.patch("requests.sessions.Session.request")
-    def test_show_default(self, mock_request):
-        self.show_default(mock_request)

@@ -3,7 +3,6 @@ import json
 from .entity import EntityEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
 from .mixins.set import EntitySetEndpointsMixin
-from ..utils.query import OWNED_ENTITY_QUERY_FIELDS, PAGINATION_PARAMETERS
 
 
 class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
@@ -24,34 +23,12 @@ class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
         name (str): endpoint name.
     """
 
-    list_parameters = (
-        "id", "name", "ownerId", "ownerSlug", "teamId", "sharedWithAccountId", "sharedWithAccountSlug", "accountSlug",
-        "projectId", "status", "setId", "globalSearch", "quickSearch", "isDefault", "materialId", "workflowName",
-        *PAGINATION_PARAMETERS,
-    )
-    query_fields = {
-        **OWNED_ENTITY_QUERY_FIELDS,
-        "inSet._id": "setId",
-        "status": "status",
-        "_material._id": "materialId",
-        "_project._id": "projectId",
-        "workflow.name": "workflowName",
-    }
+    advanced_searches = True
+    searches_sets = True
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(JobEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "jobs"
-
-    def build_filter_parameters(self, query, projection):
-        """
-        Translates a Mongo-style query and options into the flat parameters of the list endpoint.
-
-        Jobs requested by id are found wherever they are, so the search is not widened (which would drop job sets).
-        """
-        parameters = super(JobEndpoints, self).build_filter_parameters(query, projection)
-        if "id" in parameters:
-            parameters.pop("globalSearch", None)
-        return parameters
 
     def submit(self, id_):
         """
