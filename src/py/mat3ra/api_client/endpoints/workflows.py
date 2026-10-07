@@ -24,9 +24,6 @@ class WorkflowEndpoints(DefaultableEntityEndpointsMixin, EntityEndpoint):
         headers (dict): default HTTP headers.
     """
 
-    advanced_searches = True
-    searches_sets = True
-
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(WorkflowEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "workflows"

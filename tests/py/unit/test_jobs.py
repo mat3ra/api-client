@@ -90,7 +90,7 @@ class EndpointJobsUnitTest(EntityEndpointsUnitTest):
         lookup, create = mock_request.call_args_list
         self.assertTrue(lookup[1]["url"].endswith("/projects"))
         self.assertEqual(
-            json.loads(lookup[1]["params"]["advancedSearches"]), [{"isDefault": True, "owner._id": "owner"}]
+            json.loads(lookup[1]["params"]["query"]), {"isDefault": True, "owner._id": "owner"}
         )
         self.assertEqual(create[1]["url"], f"{self.base_url}/create-set")
         self.assertEqual(
@@ -105,7 +105,7 @@ class EndpointJobsUnitTest(EntityEndpointsUnitTest):
 
         lookup = mock_request.call_args_list[0]
         self.assertEqual(
-            json.loads(lookup[1]["params"]["advancedSearches"]), [{"isDefault": True, "owner._id": self.account_id}]
+            json.loads(lookup[1]["params"]["query"]), {"isDefault": True, "owner._id": self.account_id}
         )
 
     @mock.patch("requests.sessions.Session.request")

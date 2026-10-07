@@ -24,8 +24,6 @@ class ProjectEndpoints(DefaultableEntityEndpointsMixin, EntityEndpoint):
         headers (dict): default HTTP headers.
     """
 
-    advanced_searches = True
-
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(ProjectEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "projects"

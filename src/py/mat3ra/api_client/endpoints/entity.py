@@ -1,6 +1,5 @@
 import json
 
-from ..utils.query import set_parameters, translate_projection
 from . import BaseEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
 
@@ -22,12 +21,7 @@ class EntityEndpoint(BaseEndpoint):
     Attributes:
         name (str): endpoint name.
         headers (dict): default HTTP headers.
-        advanced_searches (bool): whether the list endpoint filters on `advancedSearches` instead of the `query` blob.
-        searches_sets (bool): whether the entities can be in sets (list endpoints default to the top level).
     """
-
-    advanced_searches = False
-    searches_sets = False
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(EntityEndpoint, self).__init__(host, port, version, secure, **kwargs)
@@ -38,41 +32,15 @@ class EntityEndpoint(BaseEndpoint):
         """
         Returns a list of entities.
 
-        Endpoints that filter on `advancedSearches` get the query as such (the `query` blob is still sent, for servers
-        that read it). A query is answered "anywhere" unless it names a set, as it was before.
-
         Args:
             query (dict): Mongo query. Defaults to {}.
-            projection (dict): options: limit, skip, sort. Defaults to {}.
+            projection (dict): Mongo projection. Defaults to {}.
 
         Returns:
             list[dict]
-
-        Raises:
-            ValueError: for an option or sort the endpoint does not support.
         """
         params = {"query": json.dumps(query or {}), "projection": json.dumps(projection or {})}
-        if self.advanced_searches:
-            params.update(self.build_advanced_search_parameters(query or {}, projection or {}))
         return self.request("GET", self.name, params=params, headers=self.headers)
-
-    def build_advanced_search_parameters(self, query, projection):
-        """
-        Builds the parameters of an `advancedSearches` list.
-
-        Args:
-            query (dict): Mongo query.
-            projection (dict): options: limit, skip, sort.
-
-        Returns:
-            dict
-        """
-        parameters = translate_projection(projection)
-        if query:
-            parameters["advancedSearches"] = json.dumps([query])
-        if self.searches_sets:
-            parameters.update(set_parameters(query))
-        return parameters
 
     def get(self, id_):
         """

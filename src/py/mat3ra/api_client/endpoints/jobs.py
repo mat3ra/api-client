@@ -23,9 +23,6 @@ class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
         name (str): endpoint name.
     """
 
-    advanced_searches = True
-    searches_sets = True
-
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(JobEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "jobs"
@@ -81,7 +78,8 @@ class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
         Returns:
             str
         """
-        params = {"advancedSearches": json.dumps([{"isDefault": True, "owner._id": owner_id}])}
+        query = {"isDefault": True, "owner._id": owner_id}
+        params = {"query": json.dumps(query), "projection": json.dumps({})}
         projects = self.request("GET", "projects", params=params, headers=self.headers)
         if not projects:
             raise ValueError(f"The owner {owner_id} has no default project, pass `projectId`.")
