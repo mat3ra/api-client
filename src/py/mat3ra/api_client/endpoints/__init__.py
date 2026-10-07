@@ -1,5 +1,6 @@
 import json  # noqa: F401
 
+from ..models import AuthContext
 from ..utils.http import Connection
 
 
@@ -21,12 +22,6 @@ class BaseEndpoint(object):
         self._auth = kwargs.get("auth")
         self.conn = Connection(host, port, version=version, secure=secure, **kwargs)
 
-    def _get_bearer_headers(self):
-        access_token = getattr(self._auth, "access_token", None)
-        if access_token:
-            return {"Authorization": f"Bearer {access_token}"}
-        return {}
-
     def request(self, method, endpoint_path, params=None, data=None, headers=None):
         """
         Sends an HTTP request with given params, headers and data to the given endpoint.
@@ -41,18 +36,13 @@ class BaseEndpoint(object):
         Returns:
             json: response
         """
-        request_headers = dict(headers or {})
-        bearer_headers = self._get_bearer_headers()
-        if bearer_headers:
-            request_headers.update(bearer_headers)
-            request_headers.pop("X-Account-Id", None)
-            request_headers.pop("X-Auth-Token", None)
         with self.conn:
-            self.conn.request(method, endpoint_path, params, data, request_headers or None)
+            self.conn.request(method, endpoint_path, params, data, headers)
             response = self.conn.json()
             if response["status"] != "success":
                 raise BaseException(response["data"]["message"])
             return response["data"]
 
     def get_headers(self, account_id, auth_token, content_type="application/json"):
-        return {"X-Account-Id": account_id, "X-Auth-Token": auth_token, "Content-Type": content_type}
+        auth = self._auth or AuthContext(account_id=account_id, auth_token=auth_token)
+        return {**auth.get_headers(), "Content-Type": content_type}

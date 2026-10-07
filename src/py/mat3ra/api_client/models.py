@@ -11,6 +11,11 @@ class AuthContext(BaseModel):
     account_id: Optional[str] = None
     auth_token: Optional[str] = None
 
+    def get_headers(self) -> dict:
+        if self.access_token:
+            return {"Authorization": f"Bearer {self.access_token}"}
+        return {"X-Account-Id": self.account_id, "X-Auth-Token": self.auth_token}
+
 
 class APIEnv(BaseModel):
     host: str = Field(default="platform.mat3ra.com", validation_alias="API_HOST")
