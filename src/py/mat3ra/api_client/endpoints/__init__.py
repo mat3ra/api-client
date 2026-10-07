@@ -22,6 +22,10 @@ class BaseEndpoint(object):
         self._auth = kwargs.get("auth")
         self.conn = Connection(host, port, version=version, secure=secure, **kwargs)
 
+    @property
+    def auth(self):
+        return self._auth
+
     def request(self, method, endpoint_path, params=None, data=None, headers=None):
         """
         Sends an HTTP request with given params, headers and data to the given endpoint.
@@ -36,6 +40,8 @@ class BaseEndpoint(object):
         Returns:
             json: response
         """
+        if headers and headers is self.headers:
+            headers = self.get_request_headers()
         with self.conn:
             self.conn.request(method, endpoint_path, params, data, headers)
             response = self.conn.json()
@@ -46,3 +52,6 @@ class BaseEndpoint(object):
     def get_headers(self, account_id, auth_token, content_type="application/json"):
         auth = self._auth or AuthContext(account_id=account_id, auth_token=auth_token)
         return {**auth.get_headers(), "Content-Type": content_type}
+
+    def get_request_headers(self):
+        return {**self.headers, **self._auth.get_headers()} if self._auth else self.headers
