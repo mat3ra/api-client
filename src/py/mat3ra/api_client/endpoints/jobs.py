@@ -27,6 +27,26 @@ class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
         super(JobEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "jobs"
 
+    def create(self, config, owner_id=None):
+        """
+        Creates a new job.
+
+        The server takes the workflow as a full document (the job keeps a snapshot of it), so a workflow given only
+        by its `_id` is fetched and embedded first.
+
+        Args:
+            config (dict): job config.
+            owner_id (str): owner ID. Job is created under user's default account if not specified.
+
+        Returns:
+             dict: new job.
+        """
+        workflow = config.get("workflow")
+        if isinstance(workflow, dict) and "_id" in workflow and "subworkflows" not in workflow:
+            workflow_document = self.request("GET", "/".join(("workflows", workflow["_id"])), headers=self.headers)
+            config = {**config, "workflow": workflow_document}
+        return super(JobEndpoints, self).create(config, owner_id)
+
     def submit(self, id_):
         """
         Submits a given job.
