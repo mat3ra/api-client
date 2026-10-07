@@ -24,6 +24,12 @@ class BaseEndpoint(object):
 
     @property
     def auth(self):
+        """
+        Returns the auth context shared with the API client and its other endpoints.
+
+        Returns:
+            AuthContext
+        """
         return self._auth
 
     def request(self, method, endpoint_path, params=None, data=None, headers=None):
@@ -40,8 +46,8 @@ class BaseEndpoint(object):
         Returns:
             json: response
         """
-        if headers and headers is self.headers:
-            headers = self.get_request_headers()
+        if headers:
+            headers = self.get_request_headers(headers)
         with self.conn:
             self.conn.request(method, endpoint_path, params, data, headers)
             response = self.conn.json()
@@ -53,5 +59,16 @@ class BaseEndpoint(object):
         auth = self._auth or AuthContext(account_id=account_id, auth_token=auth_token)
         return {**auth.get_headers(), "Content-Type": content_type}
 
-    def get_request_headers(self):
-        return {**self.headers, **self._auth.get_headers()} if self._auth else self.headers
+    def get_request_headers(self, headers=None):
+        """
+        Returns the given headers, or the endpoint's own, with the current credentials of the auth context. Read per
+        request, not at construction, so a token replaced on the shared AuthContext (a re-login) reaches every endpoint.
+
+        Args:
+            headers (dict): headers to send. Defaults to the endpoint's `headers`.
+
+        Returns:
+            dict
+        """
+        headers = self.headers if headers is None else headers
+        return {**headers, **self._auth.get_headers()} if self._auth else headers
