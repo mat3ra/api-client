@@ -39,7 +39,7 @@ class BaseEndpoint(object):
         Args:
             method (str): HTTP method to use.
             endpoint_path (str): endpoint path.
-            headers (dict): headers to send.
+            headers (dict): headers to send; the current auth context's headers are merged over them.
             data (dict): the body to attach to the request.
             params (dict): URL parameters to append to the URL.
 
