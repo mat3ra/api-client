@@ -30,6 +30,63 @@ class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
         super(JobEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "jobs"
 
+    def create(self, config, owner_id=None):
+        """
+        Creates a new job.
+
+        The server takes the workflow as a full document (the job keeps a snapshot of it), so a workflow given only
+        by its `_id` is fetched and embedded first.
+
+        Args:
+            config (dict): job config.
+            owner_id (str): owner ID. Job is created under user's default account if not specified.
+
+        Returns:
+             dict: new job.
+        """
+        workflow = config.get("workflow")
+        if isinstance(workflow, dict) and "_id" in workflow and "subworkflows" not in workflow:
+            workflow_document = self.request("GET", "/".join(("workflows", workflow["_id"])), headers=self.headers)
+            config = {**config, "workflow": workflow_document}
+        return super(JobEndpoints, self).create(config, owner_id)
+
+    def create_set(self, config):
+        """
+        Creates a new job set.
+
+        A job set belongs to a project, so the default project of the owner (the account if the config has no
+        `owner`) is used when the config has no `projectId`.
+
+        Args:
+            config (dict): job set config.
+
+        Returns:
+             dict: new job set.
+
+        Raises:
+            ValueError: if no project is given and the owner has no default one.
+        """
+        if "projectId" not in config:
+            owner_id = config.get("owner", {}).get("_id") or self.headers["X-Account-Id"]
+            config = {**config, "projectId": self._get_default_project_id(owner_id)}
+        return super(JobEndpoints, self).create_set(config)
+
+    def _get_default_project_id(self, owner_id):
+        """
+        Returns the ID of the default project of the given owner.
+
+        Args:
+            owner_id (str): owner ID.
+
+        Returns:
+            str
+        """
+        params = {"advancedSearches": json.dumps([{"isDefault": True, "owner._id": owner_id}])}
+        projects = self.request("GET", "projects", params=params, headers=self.headers)
+        if not projects:
+            raise ValueError(f"The owner {owner_id} has no default project, pass `projectId`.")
+        return projects[0]["_id"]
+
     def submit(self, id_):
         """
         Submits a given job.
