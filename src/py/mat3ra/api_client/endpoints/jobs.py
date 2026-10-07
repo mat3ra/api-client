@@ -47,44 +47,6 @@ class JobEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
             config = {**config, "workflow": workflow_document}
         return super(JobEndpoints, self).create(config, owner_id)
 
-    def create_set(self, config):
-        """
-        Creates a new job set.
-
-        A job set belongs to a project, so the default project of the owner (the account if the config has no
-        `owner`) is used when the config has no `projectId`.
-
-        Args:
-            config (dict): job set config.
-
-        Returns:
-             dict: new job set.
-
-        Raises:
-            ValueError: if no project is given and the owner has no default one.
-        """
-        if "projectId" not in config:
-            owner_id = config.get("owner", {}).get("_id") or self.headers["X-Account-Id"]
-            config = {**config, "projectId": self._get_default_project_id(owner_id)}
-        return super(JobEndpoints, self).create_set(config)
-
-    def _get_default_project_id(self, owner_id):
-        """
-        Returns the ID of the default project of the given owner.
-
-        Args:
-            owner_id (str): owner ID.
-
-        Returns:
-            str
-        """
-        query = {"isDefault": True, "owner._id": owner_id}
-        params = {"query": json.dumps(query), "projection": json.dumps({})}
-        projects = self.request("GET", "projects", params=params, headers=self.headers)
-        if not projects:
-            raise ValueError(f"The owner {owner_id} has no default project, pass `projectId`.")
-        return projects[0]["_id"]
-
     def submit(self, id_):
         """
         Submits a given job.
