@@ -1,7 +1,8 @@
 import os
 from unittest import mock
 
-from mat3ra.api_client import APIClient
+import pytest
+from mat3ra.api_client import APIClient, AuthContext
 
 from tests.py.unit import EndpointBaseUnitTest
 
@@ -152,3 +153,15 @@ class APIClientUnitTest(EndpointBaseUnitTest):
             org = client.my_organization
             self.assertEqual(org.id, "org-acc-1")
             self.assertEqual(org.name, "Acme Corp")
+
+
+@pytest.mark.parametrize("timeout_seconds", [5, 120])
+def test_endpoint_request_sends_client_timeout(timeout_seconds):
+    auth = AuthContext(access_token=OIDC_ACCESS_TOKEN)
+    client = APIClient(
+        host=API_HOST, port=API_PORT, version=API_VERSION, secure=False, auth=auth, timeout_seconds=timeout_seconds
+    )
+    with mock.patch("requests.sessions.Session.request") as request:
+        request.return_value.json.return_value = {"status": "success", "data": []}
+        client.jobs.list()
+    assert request.call_args[1]["timeout"] == timeout_seconds

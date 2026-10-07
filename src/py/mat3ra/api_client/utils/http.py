@@ -40,7 +40,9 @@ class BaseConnection(object):
             data (dict): the body to attach to the request.
             params (dict): URL parameters to append to the URL.
         """
-        self.response = self.session.request(method=method.lower(), url=url, params=params, data=data, headers=headers)
+        self.response = self.session.request(
+            method=method.lower(), url=url, params=params, data=data, headers=headers, timeout=self.session.timeout
+        )
         try:
             self.response.raise_for_status()
         except requests.HTTPError:
