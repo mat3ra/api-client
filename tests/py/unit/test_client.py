@@ -1,7 +1,6 @@
 import os
 from unittest import mock
 
-import pytest
 from mat3ra.api_client import APIClient, AuthContext
 
 from tests.py.unit import EndpointBaseUnitTest
@@ -12,6 +11,7 @@ API_VERSION = "2018-10-01"
 API_SECURE_FALSE = "false"
 
 OIDC_ACCESS_TOKEN = "oidc-access-token"
+NEW_OIDC_ACCESS_TOKEN = "new-oidc-access-token"
 AUTH_TOKEN = "legacy-auth-token"
 ACCOUNT_ID = "ubxMkAyx37Rjn8qK9"
 
@@ -154,14 +154,14 @@ class APIClientUnitTest(EndpointBaseUnitTest):
             self.assertEqual(org.id, "org-acc-1")
             self.assertEqual(org.name, "Acme Corp")
 
-
-@pytest.mark.parametrize("timeout_seconds", [5, 120])
-def test_endpoint_request_sends_client_timeout(timeout_seconds):
-    auth = AuthContext(access_token=OIDC_ACCESS_TOKEN)
-    client = APIClient(
-        host=API_HOST, port=API_PORT, version=API_VERSION, secure=False, auth=auth, timeout_seconds=timeout_seconds
-    )
-    with mock.patch("requests.sessions.Session.request") as request:
-        request.return_value.json.return_value = {"status": "success", "data": []}
+    @mock.patch("requests.sessions.Session.request")
+    def test_endpoint_request_sends_current_token_and_timeout(self, mock_request):
+        auth = AuthContext(access_token=OIDC_ACCESS_TOKEN)
+        client = APIClient(
+            host=API_HOST, port=API_PORT, version=API_VERSION, secure=False, auth=auth, timeout_seconds=5
+        )
+        client.auth.access_token = NEW_OIDC_ACCESS_TOKEN
+        mock_request.return_value.json.return_value = {"status": "success", "data": []}
         client.jobs.list()
-    assert request.call_args[1]["timeout"] == timeout_seconds
+        self.assertEqual(mock_request.call_args[1]["headers"]["Authorization"], f"Bearer {NEW_OIDC_ACCESS_TOKEN}")
+        self.assertEqual(mock_request.call_args[1]["timeout"], 5)
