@@ -19,7 +19,7 @@ class BaseEndpoint(object):
     """
 
     def __init__(self, host, port, version="2018-10-1", secure=True, **kwargs):
-        self._auth = kwargs.get("auth")
+        self.auth = kwargs.get("auth")
         self.conn = Connection(host, port, version=version, secure=secure, **kwargs)
 
     def request(self, method, endpoint_path, params=None, data=None, headers=None):
@@ -36,6 +36,8 @@ class BaseEndpoint(object):
         Returns:
             json: response
         """
+        if headers and self.auth:
+            headers = {**headers, **self.auth.get_headers()}
         with self.conn:
             self.conn.request(method, endpoint_path, params, data, headers)
             response = self.conn.json()
@@ -44,5 +46,5 @@ class BaseEndpoint(object):
             return response["data"]
 
     def get_headers(self, account_id, auth_token, content_type="application/json"):
-        auth = self._auth or AuthContext(account_id=account_id, auth_token=auth_token)
+        auth = self.auth or AuthContext(account_id=account_id, auth_token=auth_token)
         return {**auth.get_headers(), "Content-Type": content_type}
