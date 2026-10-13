@@ -36,7 +36,7 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
             json.loads(mock_request.call_args[1]["data"]), {"names": [FILE_NAME], "operation": "getObject"}
         )
 
-    @mock.patch("requests.put")
+    @mock.patch("requests.sessions.Session.put")
     @mock.patch("requests.sessions.Session.request")
     def test_put(self, mock_request, mock_put):
         mock_request.return_value = self.mock_response(MOCK_SIGNED_URLS_RESPONSE)
@@ -53,7 +53,7 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
         self.assertEqual(mock_put.call_args[1]["data"], FILE_CONTENT)
         self.assertEqual(mock_put.call_args[1]["timeout"], self.endpoints.conn.session.timeout)
 
-    @mock.patch("requests.put")
+    @mock.patch("requests.sessions.Session.put")
     @mock.patch("requests.sessions.Session.request")
     def test_put_refused(self, mock_request, mock_put):
         mock_request.return_value = self.mock_response(MOCK_SIGNED_URLS_RESPONSE)

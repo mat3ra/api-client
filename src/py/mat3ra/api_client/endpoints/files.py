@@ -23,12 +23,14 @@ class FileEndpoints(BaseEndpoint):
     Attributes:
         name (str): endpoint name.
         headers (dict): default HTTP headers.
+        storage_session (requests.Session): session for the pre-signed storage URLs.
     """
 
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(FileEndpoints, self).__init__(host, port, version, secure, **kwargs)
         self.name = "files"
         self.headers = self.get_headers(account_id, auth_token)
+        self.storage_session = requests.Session()
 
     def signed_urls(self, names, operation="getObject"):
         """
@@ -58,6 +60,6 @@ class FileEndpoints(BaseEndpoint):
         signed_file = self.signed_urls([key], "putObject")[0]
         with open(path, "rb") as file_:
             content = file_.read()
-        response = requests.put(signed_file["signedUrl"], data=content, timeout=self.conn.session.timeout)
+        response = self.storage_session.put(signed_file["signedUrl"], data=content, timeout=self.conn.session.timeout)
         response.raise_for_status()
         return signed_file["key"]
