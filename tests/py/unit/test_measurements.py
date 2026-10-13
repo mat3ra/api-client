@@ -6,7 +6,7 @@ from tests.py.unit.entity import MOCK_SUCCESS_RESPONSE_OBJECT, TEST_ENTITY_ID, E
 
 ENDPOINT_NAME = "measurements"
 
-MOCK_FILE = {"key": "user-rvuo7pgiyu/loops/site-1.npy", "signedUrl": "https://test-bucket.s3.amazonaws.com/site-1.npy"}
+MOCK_FILE = {"key": "user-rvuo7pgiyu/files/a.txt", "signedUrl": "https://test-bucket.s3.amazonaws.com/a.txt"}
 MOCK_FILES_RESPONSE = json.dumps({"status": "success", "data": [MOCK_FILE]})
 
 

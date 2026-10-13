@@ -79,7 +79,7 @@ Measurements are found by name inside the measurement set. Running it again crea
 
 `sample` is `{name, description, metadata}` (description and metadata optional) or just the name.
 
-Example: `tests/py/data/measurement_set/`.
+Example: `tests/py/data/upload_folder/`.
 
 # Examples
 

@@ -1,0 +1,63 @@
+{
+    "name": "workflow-1",
+    "subworkflows": [
+        {
+            "name": "subworkflow-1",
+            "application": {
+                "name": "application-1",
+                "shortName": "application-1",
+                "summary": "Application 1",
+                "version": "1.0",
+                "build": "default"
+            },
+            "properties": [],
+            "model": {
+                "type": "unknown",
+                "subtype": "unknown",
+                "method": {
+                    "type": "unknown",
+                    "subtype": "unknown"
+                }
+            },
+            "units": [
+                {
+                    "type": "execution",
+                    "name": "unit-1",
+                    "flowchartId": "unit-1",
+                    "application": {
+                        "name": "application-1",
+                        "shortName": "application-1",
+                        "summary": "Application 1",
+                        "version": "1.0",
+                        "build": "default"
+                    },
+                    "executable": {
+                        "applicationName": "application-1",
+                        "applicationVersion": "*",
+                        "name": "executable-1"
+                    },
+                    "flavor": {
+                        "applicationName": "application-1",
+                        "applicationVersion": "*",
+                        "executableName": "executable-1",
+                        "name": "flavor-1",
+                        "input": [],
+                        "monitors": [],
+                        "preProcessors": [],
+                        "postProcessors": [],
+                        "results": []
+                    },
+                    "input": [],
+                    "context": [],
+                    "results": [],
+                    "monitors": [],
+                    "preProcessors": [],
+                    "postProcessors": []
+                }
+            ]
+        }
+    ],
+    "units": [],
+    "properties": [],
+    "workflows": []
+}

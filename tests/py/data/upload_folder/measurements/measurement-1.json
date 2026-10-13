@@ -1,0 +1,8 @@
+{
+    "name": "measurement-1",
+    "status": "finished",
+    "setup": {},
+    "sample": {
+        "name": "sample-1"
+    }
+}

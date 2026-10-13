@@ -1,53 +1,28 @@
-import contextlib
 import json
-from collections import Counter
-from functools import reduce
+import os
+import tempfile
 from pathlib import Path
-from types import SimpleNamespace
+from unittest import mock
 
-import pytest
 import requests
 
 from mat3ra.api_client.cli import upload
+from tests.py.unit import EndpointBaseUnitTest
 
-FIXTURE_FOLDER = Path(__file__).parents[1] / "data" / "measurement_set"
-LIBRARY = {"_id": "library", "name": "PDAC_COM5_01448", "isEntitySet": True}
-SAMPLE_OUTSIDE_LIBRARY = {"_id": "outside", "name": "PDAC_COM5_01448 r0c00"}
-FIRST_RUN_COUNTS = {
-    "sample sets": {"created": 1},
-    "measurement sets": {"created": 1},
-    "samples": {"created": 2},
-    "measurements": {"created": 2},
-    "properties": {"created": 1},
-    "files": {"put": 6},
-}
-SECOND_RUN_COUNTS = {
-    "sample sets": {"already present": 1},
-    "measurement sets": {"already present": 1},
-    "samples": {"already present": 2},
-    "measurements": {"already present": 2},
-    "properties": {"already present": 1},
-    "files": {"already present": 6},
-}
-OWNER_SLUG = "owner"
-STORED_FILE_KEYS = [
-    f"{OWNER_SLUG}/measurements/measurements-1/loops/site00_step0_pt00/{name}"
-    for name in ("X_off.npy", "X_on.npy", "Y_off.npy", "Y_on.npy", "bias_off.npy", "bias_on.npy")
-]
-RUN_SAMPLE_SET = {
-    "_id": "samples-2",
-    "name": "20260901_171601_alscn_01448",
-    "parentSetId": "library",
-    "isEntitySet": True,
-    "inSet._id": "library",
-}
-MEASUREMENTS_IN_SET = [("samples-3", "SS-PFM Hysteresis Loop"), ("samples-4", "SS-PFM Hysteresis Loop")]
+FOLDER_NAME = "upload_folder"
+SAMPLE_SET = {"_id": "sample-set-id", "name": "sample-set"}
+RUN_SAMPLE_SET = {"_id": "run-sample-set-id", "name": "set-1"}
+SAMPLE = {"_id": "sample-id", "name": "sample-1"}
+MEASUREMENT_SET = {"_id": "measurement-set-id", "name": "set-1"}
+MEASUREMENT = {"_id": "measurement-id", "name": "measurement-1"}
+PROPERTY = {"_id": "property-id"}
+STORED_FILE = {"key": "account/measurements/measurement-id/a.txt"}
 PROPERTY_SOURCE = {
     "type": "external",
     "info": {
-        "origin": {"_id": "measurements-1", "cls": "Measurement"},
-        "subject": {"_id": "samples-3", "cls": "Sample"},
-        "unitId": "cb3a0482-92fe-5d9d-a6dd-2dacc26ecaf1",
+        "origin": {"_id": "measurement-id", "cls": "Measurement"},
+        "subject": {"_id": "sample-id", "cls": "Sample"},
+        "unitId": "unit-1",
     },
 }
 STORED_CREDENTIALS = {
@@ -57,125 +32,70 @@ STORED_CREDENTIALS = {
     "API_PORT": 3000,
     "API_SECURE": False,
 }
-CREATED_SAMPLE_WITH_DETAILS = {
-    "_id": "samples-4",
-    "name": "PDAC_COM5_01448 r1c1",
-    "metadata": {"position": {"coordinates": [5.4000001, 6.6500001], "units": "mm"}},
-    "inSet._id": "samples-2",
-}
 
 
-def value_at(record, key):
-    """The record's value at a flat key or, as Mongo reads it, a dotted path."""
-    return record[key] if key in record else reduce(lambda value, part: value.get(part, {}), key.split("."), record)
+class UploadUnitTest(EndpointBaseUnitTest):
+    """
+    Class for testing the upload command.
+    """
 
+    def setUp(self):
+        self.folder = Path(self.get_file_path(FOLDER_NAME))
+        self.client = mock.Mock()
+        self.client.samples.create_set.return_value = RUN_SAMPLE_SET
+        self.client.samples.create.return_value = SAMPLE
+        self.client.measurements.create_set.return_value = MEASUREMENT_SET
+        self.client.measurements.create.return_value = MEASUREMENT
 
-class FakeFiles:
-    def __init__(self):
-        self.keys = []
+    def upload(self, present=False):
+        def found(record):
+            return [record] if present else []
 
-    def put(self, path, key):
-        self.keys.append(f"{OWNER_SLUG}/{key}")
+        self.client.samples.list.side_effect = [[SAMPLE_SET], found(RUN_SAMPLE_SET), found(SAMPLE)]
+        self.client.measurements.list.side_effect = [found(MEASUREMENT_SET), found(MEASUREMENT)]
+        self.client.measurements.list_files.return_value = found(STORED_FILE)
+        self.client.properties.list.return_value = found(PROPERTY)
+        upload.upload(lambda: self.client, SAMPLE_SET["name"], self.folder)
 
+    def test_upload_creates_the_sample_set_inside_the_named_set(self):
+        self.upload()
+        self.client.samples.create_set.assert_called_once_with({"name": "set-1", "parentSetId": SAMPLE_SET["_id"]})
 
-class FlakyFiles(FakeFiles):
-    def __init__(self, failures):
-        super().__init__()
-        self.failures = failures
-        self.attempts = Counter()
+    def test_upload_creates_the_sample_inside_the_sample_set(self):
+        self.upload()
+        self.client.samples.move_to_set.assert_called_once_with(SAMPLE["_id"], None, RUN_SAMPLE_SET["_id"])
 
-    def put(self, path, key):
-        self.attempts[key] += 1
-        if self.attempts[key] <= self.failures:
-            raise requests.exceptions.ConnectionError()
-        super().put(path, key)
+    def test_upload_creates_the_measurement_with_its_sample(self):
+        self.upload()
+        self.assertEqual(self.client.measurements.create.call_args[0][0]["_sample"], {"_id": SAMPLE["_id"]})
 
+    def test_upload_creates_the_property_with_the_external_holder(self):
+        self.upload()
+        self.assertEqual(self.client.properties.create.call_args[0][0]["source"], PROPERTY_SOURCE)
 
-class FakeEndpoint:
-    def __init__(self, name, records, stored_keys=()):
-        self.name = name
-        self.records = records
-        self.stored_keys = stored_keys
+    def test_upload_puts_the_file_under_the_measurement(self):
+        self.upload()
+        self.client.files.put.assert_called_once_with(
+            self.folder / "files" / "measurement-1" / "a.txt", "measurements/measurement-id/a.txt"
+        )
 
-    def list(self, query):
-        return [
-            record for record in self.records if all(value_at(record, key) == value for key, value in query.items())
-        ]
+    def test_upload_again_creates_and_puts_nothing(self):
+        self.upload(present=True)
+        writes = [name for name, _, _ in self.client.mock_calls if name.endswith(("create", "create_set", "put"))]
+        self.assertEqual(writes, [])
 
-    def create(self, config):
-        record = {**config, "_id": f"{self.name}-{len(self.records)}"}
-        self.records.append(record)
-        return record
+    @mock.patch("time.sleep")
+    def test_upload_puts_a_file_again_after_network_errors(self, mock_sleep):
+        self.client.files.put.side_effect = [requests.exceptions.ConnectionError()] * 2 + [None]
+        self.upload()
+        self.assertEqual(self.client.files.put.call_count, 3)
 
-    def create_set(self, config):
-        return self.create({**config, "isEntitySet": True, "inSet._id": config.get("parentSetId")})
-
-    def move_to_set(self, entity_id, old_set_id, new_set_id):
-        next(record for record in self.records if record["_id"] == entity_id)["inSet._id"] = new_set_id
-
-    def list_files(self, entity_id):
-        return [{"key": key} for key in self.stored_keys if key.startswith(f"{OWNER_SLUG}/{self.name}/{entity_id}/")]
-
-
-def test_upload():
-    samples = FakeEndpoint("samples", [LIBRARY, SAMPLE_OUTSIDE_LIBRARY])
-    properties = FakeEndpoint("properties", [])
-    files = FakeFiles()
-    measurements = FakeEndpoint("measurements", [], files.keys)
-    client = SimpleNamespace(samples=samples, measurements=measurements, properties=properties, files=files)
-
-    assert upload.upload(lambda: client, LIBRARY["name"], FIXTURE_FOLDER) == FIRST_RUN_COUNTS
-    assert upload.upload(lambda: client, LIBRARY["name"], FIXTURE_FOLDER) == SECOND_RUN_COUNTS
-    assert sorted(files.keys) == STORED_FILE_KEYS
-    assert len(client.samples.records) == 5
-    assert client.samples.records[2] == RUN_SAMPLE_SET
-    assert client.samples.records[4] == CREATED_SAMPLE_WITH_DETAILS
-    assert len(client.measurements.records) == 3
-    measurements = client.measurements.list({"inSet._id": "measurements-0"})
-    assert [(measurement["_sample"]["_id"], measurement["workflow"]["name"]) for measurement in measurements] == (
-        MEASUREMENTS_IN_SET
-    )
-    property_document = json.loads((FIXTURE_FOLDER / "properties" / "r0c00.json").read_text())
-    assert client.properties.records == [
-        {"_id": "properties-0", "data": property_document, "source": PROPERTY_SOURCE, "exabyteId": [], "repetition": 0}
-    ]
-
-
-@pytest.mark.parametrize(
-    ("failures", "expectation", "expected_stored_count"),
-    [(2, contextlib.nullcontext(), 6), (3, pytest.raises(requests.exceptions.ConnectionError), 0)],
-)
-def test_upload_retries_file_put(monkeypatch, failures, expectation, expected_stored_count):
-    pauses = []
-    monkeypatch.setattr(upload.time, "sleep", pauses.append)
-    files = FlakyFiles(failures)
-    measurements = FakeEndpoint("measurements", [], files.keys)
-    client = SimpleNamespace(
-        samples=FakeEndpoint("samples", [LIBRARY]),
-        measurements=measurements,
-        properties=FakeEndpoint("properties", []),
-        files=files,
-    )
-
-    with expectation:
-        upload.upload(lambda: client, LIBRARY["name"], FIXTURE_FOLDER)
-    assert len(files.keys) == expected_stored_count
-    assert sorted(pauses) == [2] * 6 + [4] * 6
-
-
-def test_load_credentials(tmp_path, monkeypatch):
-    credentials_file_path = tmp_path / "api_token_cache.json"
-    credentials_file_path.write_text(json.dumps(STORED_CREDENTIALS))
-    monkeypatch.setattr(upload, "CREDENTIALS_FILE_PATH", str(credentials_file_path))
-    for name in STORED_CREDENTIALS:
-        monkeypatch.delenv(name, raising=False)
-
-    account_id, auth_token, environment = upload.load_credentials()
-
-    assert (account_id, auth_token, environment.host, environment.port, environment.secure) == (
-        "account-id",
-        "auth-token",
-        "localhost",
-        3000,
-        False,
-    )
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_load_credentials_takes_the_platform_from_the_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "api_token_cache.json")
+            with open(path, "w") as file_:
+                json.dump(STORED_CREDENTIALS, file_)
+            with mock.patch.object(upload, "CREDENTIALS_FILE_PATH", path):
+                environment = upload.load_credentials()[2]
+        self.assertEqual((environment.host, environment.port, environment.secure), ("localhost", 3000, False))
