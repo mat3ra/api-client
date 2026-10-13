@@ -39,6 +39,48 @@ client = APIClient.authenticate()
 materials = client.materials.list()
 ```
 
+# Measurement upload
+
+Two commands put a folder of measurements into the platform as one measurement set; their samples go into a sample
+set created in the web app.
+
+```bash
+pip install "git+https://github.com/mat3ra/api-client.git@<commit>"
+```
+
+For a platform other than `platform.mat3ra.com`, set `API_HOST` (and `API_PORT`, `API_SECURE`).
+
+Sign in once:
+
+```bash
+mat3ra-auth
+```
+
+Prints a sign-in link and code. After you confirm, it stores your account id and an API token, which does not expire,
+in `~/.mat3ra/api_token_cache.json`. Setting `ACCOUNT_ID` and `AUTH_TOKEN` in the environment replaces this step.
+
+Upload:
+
+```bash
+mat3ra-upload <SAMPLE_SET_NAME> <FOLDER>
+```
+
+Samples go into a sample set named as the measurement set, inside the named set; they are matched by name there.
+Measurements are found by name inside the measurement set. Running it again creates nothing new.
+
+```
+<FOLDER>/
+    set.json            name, description, metadata of the measurement set
+    workflow.json       the workflow of every measurement
+    measurements/*.json name, description, metadata, setup, status, and sample
+    properties/*.json   optional: a property of the measurement with the same file name
+    files/<label>/      optional: the files of measurements/<label>.json under their run paths, e.g. loops/<point>/
+```
+
+`sample` is `{name, description, metadata}` (description and metadata optional) or just the name.
+
+Example: `tests/py/data/measurement_set/`.
+
 # Examples
 
 [api-examples](https://github.com/Exabyte-io/api-examples) repository contains examples for performing most-common tasks in the Mat3ra.com platform through its RESTful API in Jupyter Notebook format.

@@ -25,6 +25,10 @@ dependencies = [
     "pydantic>=2,<3",
 ]
 
+[project.scripts]
+mat3ra-auth = "mat3ra.api_client.cli.auth:main"
+mat3ra-upload = "mat3ra.api_client.cli.upload:main"
+
 [project.optional-dependencies]
 dev = [
     "pre-commit",
