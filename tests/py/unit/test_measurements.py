@@ -1,9 +1,13 @@
+import json
 from unittest import mock
 
 from mat3ra.api_client.endpoints.measurements import MeasurementEndpoints
-from tests.py.unit.entity import MOCK_SUCCESS_RESPONSE_OBJECT, EntityEndpointsUnitTest
+from tests.py.unit.entity import MOCK_SUCCESS_RESPONSE_OBJECT, TEST_ENTITY_ID, EntityEndpointsUnitTest
 
 ENDPOINT_NAME = "measurements"
+
+MOCK_FILE = {"key": "user-rvuo7pgiyu/loops/site-1.npy", "signedUrl": "https://test-bucket.s3.amazonaws.com/site-1.npy"}
+MOCK_FILES_RESPONSE = json.dumps({"status": "success", "data": [MOCK_FILE]})
 
 
 class EndpointMeasurementsUnitTest(EntityEndpointsUnitTest):
@@ -33,3 +37,9 @@ class EndpointMeasurementsUnitTest(EntityEndpointsUnitTest):
         mock_request.return_value = self.mock_response(MOCK_SUCCESS_RESPONSE_OBJECT)
         self.endpoints.create_set({})
         self.assertEqual(mock_request.call_args[1]["url"], f"{self.base_url}/create-set")
+
+    @mock.patch("requests.sessions.Session.request")
+    def test_list_files(self, mock_request):
+        mock_request.return_value = self.mock_response(MOCK_FILES_RESPONSE)
+        self.assertEqual(self.endpoints.list_files(TEST_ENTITY_ID), [MOCK_FILE])
+        self.assertEqual(mock_request.call_args[1]["url"], f"{self.base_url}/{TEST_ENTITY_ID}/files")

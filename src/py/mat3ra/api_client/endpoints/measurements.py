@@ -24,3 +24,15 @@ class MeasurementEndpoints(EntitySetEndpointsMixin, EntityEndpoint):
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(MeasurementEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "measurements"
+
+    def list_files(self, id_):
+        """
+        Returns a list of measurement files.
+
+        Args:
+            id_ (str): measurement ID.
+
+        Returns:
+            list: [{"key": str, "signedUrl": str}]
+        """
+        return self.request("GET", "/".join((self.name, id_, "files")), headers=self.headers)

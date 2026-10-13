@@ -8,6 +8,7 @@ from .constants import _build_base_url
 from .endpoints.bank_materials import BankMaterialEndpoints
 from .endpoints.bank_workflows import BankWorkflowEndpoints
 from .endpoints.clusters import ClustersEndpoint
+from .endpoints.files import FileEndpoints
 from .endpoints.jobs import JobEndpoints
 from .endpoints.materials import MaterialEndpoints
 from .endpoints.measurements import MeasurementEndpoints
@@ -58,6 +59,7 @@ class APIClient(BaseModel):
         self.workflows = WorkflowEndpoints(*base_args, **base_kwargs)
         self.jobs = JobEndpoints(*base_args, **base_kwargs)
         self.measurements = MeasurementEndpoints(*base_args, **base_kwargs)
+        self.files = FileEndpoints(*base_args, **base_kwargs)
         self.projects = ProjectEndpoints(*base_args, **base_kwargs)
         self.properties = PropertiesEndpoints(*base_args, **base_kwargs)
         self.metaproperties = MetaPropertiesEndpoints(*base_args, **base_kwargs)
