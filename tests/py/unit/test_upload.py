@@ -50,6 +50,13 @@ PROPERTY_SOURCE = {
         "unitId": "cb3a0482-92fe-5d9d-a6dd-2dacc26ecaf1",
     },
 }
+STORED_CREDENTIALS = {
+    "ACCOUNT_ID": "account-id",
+    "AUTH_TOKEN": "auth-token",
+    "API_HOST": "localhost",
+    "API_PORT": 3000,
+    "API_SECURE": False,
+}
 CREATED_SAMPLE_WITH_DETAILS = {
     "_id": "samples-4",
     "name": "PDAC_COM5_01448 r1c1",
@@ -154,3 +161,21 @@ def test_upload_retries_file_put(monkeypatch, failures, expectation, expected_st
         upload.upload(lambda: client, LIBRARY["name"], FIXTURE_FOLDER)
     assert len(files.keys) == expected_stored_count
     assert sorted(pauses) == [2] * 6 + [4] * 6
+
+
+def test_load_credentials(tmp_path, monkeypatch):
+    credentials_file_path = tmp_path / "api_token_cache.json"
+    credentials_file_path.write_text(json.dumps(STORED_CREDENTIALS))
+    monkeypatch.setattr(upload, "CREDENTIALS_FILE_PATH", str(credentials_file_path))
+    for name in STORED_CREDENTIALS:
+        monkeypatch.delenv(name, raising=False)
+
+    account_id, auth_token, environment = upload.load_credentials()
+
+    assert (account_id, auth_token, environment.host, environment.port, environment.secure) == (
+        "account-id",
+        "auth-token",
+        "localhost",
+        3000,
+        False,
+    )

@@ -15,18 +15,24 @@ import requests
 
 from ..client import APIClient
 from ..constants import ACCOUNT_ID_ENV_VAR, AUTH_TOKEN_ENV_VAR
+from ..models import APIEnv
 from .auth import CREDENTIALS_FILE_PATH
 
 
 def load_credentials():
-    """Returns the account id and API token from the environment, else from the file mat3ra-auth wrote."""
+    """
+    Returns the account id and API token from the environment, else from the file mat3ra-auth wrote, and the platform:
+    host, port and secure from the environment where set, else from the file, else the defaults.
+    """
+    stored = json.loads(Path(CREDENTIALS_FILE_PATH).read_text()) if os.path.exists(CREDENTIALS_FILE_PATH) else {}
     if os.environ.get(ACCOUNT_ID_ENV_VAR) and os.environ.get(AUTH_TOKEN_ENV_VAR):
         credentials = os.environ
-    elif os.path.exists(CREDENTIALS_FILE_PATH):
-        credentials = json.loads(Path(CREDENTIALS_FILE_PATH).read_text())
+    elif stored:
+        credentials = stored
     else:
         sys.exit("No API credentials: run `mat3ra-auth`, or set ACCOUNT_ID and AUTH_TOKEN.")
-    return credentials[ACCOUNT_ID_ENV_VAR], credentials[AUTH_TOKEN_ENV_VAR]
+    environment = APIEnv.model_validate({**stored, **os.environ})
+    return credentials[ACCOUNT_ID_ENV_VAR], credentials[AUTH_TOKEN_ENV_VAR], environment
 
 
 def put_file(files_endpoint, path, key):
@@ -113,8 +119,15 @@ def main():
     parser.add_argument("sample_set_name")
     parser.add_argument("folder", type=Path)
     arguments = parser.parse_args()
-    account_id, auth_token = load_credentials()
-    new_client = partial(APIClient.authenticate, account_id=account_id, auth_token=auth_token)
+    account_id, auth_token, environment = load_credentials()
+    new_client = partial(
+        APIClient.authenticate,
+        host=environment.host,
+        port=environment.port,
+        secure=environment.secure,
+        account_id=account_id,
+        auth_token=auth_token,
+    )
     for kind, kind_counts in upload(new_client, arguments.sample_set_name, arguments.folder).items():
         new_state = "put" if kind == "files" else "created"
         print(f"{kind}: {kind_counts[new_state]} {new_state}, {kind_counts['already present']} already present")
