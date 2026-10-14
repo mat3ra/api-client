@@ -39,45 +39,50 @@ client = APIClient.authenticate()
 materials = client.materials.list()
 ```
 
-# Measurement upload
+# Uploading measurements
 
-Two commands put a folder of measurements into the platform as one measurement set; their samples go into a sample
-set created in the web app.
+1. In the platform, under Samples, create a Sample Set for the wafer with its name and a description. Synthesis notes
+   are fine as free text in the description.
 
-```bash
-pip install "git+https://github.com/mat3ra/api-client.git@<commit>"
+2. Install the commands:
+
+   ```bash
+   pip install "git+https://github.com/mat3ra/api-client.git@548df39"
+   ```
+
+3. Sign in once, then confirm the printed code in the browser:
+
+   ```bash
+   API_HOST=<platform host> mat3ra-auth
+   ```
+
+   The account id, an API token that does not expire and the host are stored in `~/.mat3ra/api_token_cache.json`.
+
+4. Upload a folder:
+
+   ```bash
+   mat3ra-upload <wafer set name> <folder>
+   ```
+
+   The measurements go into a measurement set named as in `set.json`, their samples into a sample set of the same name
+   inside the wafer's set. Running it again uploads only what is missing.
+
+## The folder
+
+```
+<folder>/
+    set.json                   name, description, metadata of the measurement set
+    workflow.json              the procedure, as a workflow document; used for every measurement
+    measurements/<label>.json  name, description, status, setup, sample, metadata of one measurement
+    properties/<label>.json    optional: a property of that measurement
+    files/<label>/...          optional: files of that measurement, any names and layout, uploaded as found
 ```
 
-For a platform other than `platform.mat3ra.com`, set `API_HOST` (and `API_PORT`, `API_SECURE`).
-
-Sign in once:
-
-```bash
-mat3ra-auth
-```
-
-Prints a sign-in link and code. After you confirm, it stores your account id and an API token, which does not expire,
-in `~/.mat3ra/api_token_cache.json`. Setting `ACCOUNT_ID` and `AUTH_TOKEN` in the environment replaces this step.
-
-Upload:
-
-```bash
-mat3ra-upload <SAMPLE_SET_NAME> <FOLDER>
-```
-
-Samples go into a sample set named as the measurement set, inside the named set; they are matched by name there.
-Measurements are found by name inside the measurement set. Running it again creates nothing new.
-
-```
-<FOLDER>/
-    set.json            name, description, metadata of the measurement set
-    workflow.json       the workflow of every measurement
-    measurements/*.json name, description, metadata, setup, status, and sample
-    properties/*.json   optional: a property of the measurement with the same file name
-    files/<label>/      optional: the files of measurements/<label>.json under their run paths
-```
-
-`sample` is `{name, description, metadata}` (description and metadata optional) or just the name.
+- `setup` holds `instrument`, `session` and `settings` as the lab has them.
+- `sample` is `{name, description, metadata}`, or just the name; samples are matched by name.
+- A property file is accepted only for a property type the platform defines, listed in the
+  [esse properties directory](https://github.com/mat3ra/esse/tree/dev/schema/properties_directory).
+- Anything the folder has no field for goes into `metadata` of the record it describes and is shown as JSON.
 
 Example: `tests/py/data/upload_folder/`.
 
