@@ -47,13 +47,13 @@ materials = client.materials.list()
 2. Install the commands:
 
    ```bash
-   pip install "git+https://github.com/mat3ra/api-client.git@839f55b"
+   pip install "git+https://github.com/mat3ra/api-client.git@e488bb8"
    ```
 
-3. Sign in once, then confirm the printed code in the browser:
+3. Sign in once, confirm the printed code in the browser where you are signed in to the platform:
 
    ```bash
-   API_HOST=<platform host> mat3ra-auth
+   mat3ra-auth alphafilm.mat3ra.com
    ```
 
    The account id, an API token that does not expire and the host are stored in `~/.mat3ra/api_token_cache.json`.
@@ -83,7 +83,8 @@ materials = client.materials.list()
 - `sample` is `{name, description, metadata}`, or just the name; samples are matched by name.
 - A property file is accepted only for a property type the platform defines, listed in the
   [esse properties directory](https://github.com/mat3ra/esse/tree/dev/schema/properties_directory).
-- Anything the folder has no field for goes into `metadata` of the record it describes and is shown as JSON.
+- A result becomes a property only when the platform has a type for it; results of other kinds stay in the files.
+  `metadata` is for context (positions, labels, session), never a result.
 
 Example: `tests/py/data/upload_folder/`.
 
