@@ -39,6 +39,55 @@ client = APIClient.authenticate()
 materials = client.materials.list()
 ```
 
+# Uploading measurements
+
+1. In the platform, under Samples, create a Sample Set for the wafer with its name and a description. Synthesis notes
+   are fine as free text in the description.
+
+2. Install the commands:
+
+   ```bash
+   pip install "git+https://github.com/mat3ra/api-client.git@5b600e7"
+   ```
+
+3. Sign in once, confirm the printed code in the browser where you are signed in to the platform:
+
+   ```bash
+   mat3ra-auth alphafilm.mat3ra.com
+   ```
+
+   The account id, an API token that does not expire and the host are stored in `~/.mat3ra/api_token_cache.json`.
+
+4. Upload a folder:
+
+   ```bash
+   mat3ra-upload <wafer set name> <folder>
+   ```
+
+   The measurements go into a measurement set named as in `set.json`, their samples into a sample set of the same name
+   inside the wafer's set. Running it again uploads only what is missing. Files go up 32 at a time (`WORKERS` in
+   `cli/upload.py`), at about half a CPU core and 100 MB of memory.
+
+## The folder
+
+```
+<folder>/
+    set.json               name, description, metadata of the measurement set
+    <measurement>/         one folder per measurement, any name
+        measurement.json   name, description, status, setup, workflow, sample, properties, metadata
+        files/...          optional, the measurement's files as delivered
+```
+
+- `setup` holds `instrument`, `session` and `settings` as the lab has them.
+- `sample` is `{name, description, metadata}`, or just the name; samples are matched by name.
+- `properties` inside measurement.json is a list of property documents, accepted only for property types the platform
+  defines, listed in the
+  [esse properties directory](https://github.com/mat3ra/esse/tree/dev/schema/properties_directory).
+- A result becomes a property only when the platform has a type for it; results of other kinds stay in the files.
+  `metadata` is for context (positions, labels, session), never a result.
+
+Example: `tests/py/data/upload_folder/`.
+
 # Examples
 
 [api-examples](https://github.com/Exabyte-io/api-examples) repository contains examples for performing most-common tasks in the Mat3ra.com platform through its RESTful API in Jupyter Notebook format.
