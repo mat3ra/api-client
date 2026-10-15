@@ -71,6 +71,10 @@ class UploadUnitTest(EndpointBaseUnitTest):
         self.upload()
         self.assertEqual(self.client.measurements.create.call_args[0][0]["_sample"], {"_id": SAMPLE["_id"]})
 
+    def test_upload_creates_the_measurement_without_sample_and_properties(self):
+        self.upload()
+        self.assertEqual(self.client.measurements.create.call_args[0][0].keys() & {"sample", "properties"}, set())
+
     def test_upload_creates_the_property_with_the_external_holder(self):
         self.upload()
         self.assertEqual(self.client.properties.create.call_args[0][0]["source"], PROPERTY_SOURCE)
