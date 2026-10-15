@@ -37,14 +37,14 @@ def load_credentials():
     return credentials[ACCOUNT_ID_ENV_VAR], credentials[AUTH_TOKEN_ENV_VAR], environment
 
 
-def put_file(files_endpoint, path, key, signed_url):
+def put_file(files_endpoint, path, key, signed_file):
     """Puts the file, again after 2 s and 4 s when the network fails; any other error stops the run."""
     for pause_seconds in (2, 4):
         try:
-            return files_endpoint.put(path, key, signed_url)
+            return files_endpoint.put(path, key, signed_file)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             time.sleep(pause_seconds)
-    return files_endpoint.put(path, key, signed_url)
+    return files_endpoint.put(path, key, signed_file)
 
 
 def find_or_create_in_set(endpoint, config, set_id, counts):
@@ -100,8 +100,7 @@ def upload(new_client, sample_set_name, folder):
                 missing_files[key] = file_path
         if missing_files:
             signed_files = client.files.signed_urls(list(missing_files), "putObject")
-            signed_urls = [signed_file["signedUrl"] for signed_file in signed_files]
-            files_to_put += zip(missing_files.values(), missing_files, signed_urls)
+            files_to_put += zip(missing_files.values(), missing_files, signed_files)
         property_path = folder / "properties" / path.name
         if not property_path.exists():
             continue

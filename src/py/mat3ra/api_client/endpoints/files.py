@@ -47,19 +47,19 @@ class FileEndpoints(BaseEndpoint):
         data = {"names": names, "operation": operation}
         return self.request("POST", "/".join((self.name, "signed-urls")), data=json.dumps(data), headers=self.headers)
 
-    def put(self, path, key, signed_url=None):
+    def put(self, path, key, signed_file=None):
         """
         Uploads a given file to the account's folder through a pre-signed URL.
 
         Args:
             path (str): path to the file to upload.
             key (str): file name, relative to the account's folder.
-            signed_url (str): pre-signed putObject URL for the key; requested when not given.
+            signed_file (dict): the putObject entry `signed_urls` returned for the key; requested when not given.
 
         Returns:
             str: the key the file is stored under.
         """
-        signed_file = {"key": key, "signedUrl": signed_url} if signed_url else self.signed_urls([key], "putObject")[0]
+        signed_file = signed_file or self.signed_urls([key], "putObject")[0]
         with open(path, "rb") as file_:
             response = self.storage_session.put(
                 signed_file["signedUrl"],

@@ -17,7 +17,7 @@ MEASUREMENT_SET = {"_id": "measurement-set-id", "name": "set-1"}
 MEASUREMENT = {"_id": "measurement-id", "name": "measurement-1"}
 PROPERTY = {"_id": "property-id"}
 STORED_FILE = {"key": "account/measurements/measurement-id/a.txt"}
-SIGNED_URL = "https://storage/account/measurements/measurement-id/a.txt?signature"
+SIGNED_FILE = {"signedUrl": "https://storage/account/measurements/measurement-id/a.txt?signature"}
 PROPERTY_SOURCE = {
     "type": "external",
     "info": {
@@ -47,7 +47,7 @@ class UploadUnitTest(EndpointBaseUnitTest):
         self.client.samples.create.return_value = SAMPLE
         self.client.measurements.create_set.return_value = MEASUREMENT_SET
         self.client.measurements.create.return_value = MEASUREMENT
-        self.client.files.signed_urls.return_value = [{"signedUrl": SIGNED_URL}]
+        self.client.files.signed_urls.return_value = [SIGNED_FILE]
 
     def upload(self, present=False):
         def found(record):
@@ -80,7 +80,7 @@ class UploadUnitTest(EndpointBaseUnitTest):
         self.client.files.put.assert_called_once_with(
             self.folder / "files" / "measurement-1" / "a.txt",
             "measurements/measurement-id/a.txt",
-            SIGNED_URL,
+            SIGNED_FILE,
         )
 
     def test_upload_signs_the_missing_files_once_per_measurement(self):
@@ -93,7 +93,11 @@ class UploadUnitTest(EndpointBaseUnitTest):
 
     def test_upload_again_creates_and_puts_nothing(self):
         self.upload(present=True)
-        writes = [name for name, _, _ in self.client.mock_calls if name.endswith(("create", "create_set", "put"))]
+        writes = [
+            name
+            for name, _, _ in self.client.mock_calls
+            if name.endswith(("create", "create_set", "signed_urls", "put"))
+        ]
         self.assertEqual(writes, [])
 
     @mock.patch("time.sleep")

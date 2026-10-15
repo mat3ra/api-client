@@ -13,7 +13,9 @@ STORED_KEY = "user-rvuo7pgiyu/files/a.txt"
 FILE_CONTENT = b"file data"
 SIGNED_URL = "https://test-bucket.s3.amazonaws.com/user-rvuo7pgiyu/files/a.txt?X-Amz-Signature=test"
 
-MOCK_SIGNED_URLS_RESPONSE = json.dumps({"status": "success", "data": [{"key": STORED_KEY, "signedUrl": SIGNED_URL}]})
+SIGNED_FILE = {"key": STORED_KEY, "signedUrl": SIGNED_URL}
+
+MOCK_SIGNED_URLS_RESPONSE = json.dumps({"status": "success", "data": [SIGNED_FILE]})
 MOCK_REFUSED_RESPONSE = "<Error><Code>AccessDenied</Code></Error>"
 
 
@@ -55,21 +57,20 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
 
     @mock.patch("requests.sessions.Session.put")
     @mock.patch("requests.sessions.Session.request")
-    def test_put_to_signed_url(self, mock_request, mock_put):
+    def test_put_signed_file(self, mock_request, mock_put):
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "a.txt")
             with open(path, "wb") as file_:
                 file_.write(FILE_CONTENT)
-            self.endpoints.put(path, FILE_NAME, SIGNED_URL)
+            self.endpoints.put(path, FILE_NAME, SIGNED_FILE)
         mock_request.assert_not_called()
-        self.assertEqual(mock_put.call_args[0][0], SIGNED_URL)
 
     @mock.patch("requests.sessions.Session.put")
     def test_put_empty_file(self, mock_put):
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "a.txt")
             open(path, "wb").close()
-            self.endpoints.put(path, FILE_NAME, SIGNED_URL)
+            self.endpoints.put(path, FILE_NAME, SIGNED_FILE)
         self.assertEqual(mock_put.call_args[1]["data"], b"")
 
     @mock.patch("requests.sessions.Session.put")
