@@ -1,4 +1,5 @@
 import json
+import os
 
 import requests
 
@@ -60,6 +61,10 @@ class FileEndpoints(BaseEndpoint):
         """
         signed_file = {"key": key, "signedUrl": signed_url} if signed_url else self.signed_urls([key], "putObject")[0]
         with open(path, "rb") as file_:
-            response = self.storage_session.put(signed_file["signedUrl"], data=file_, timeout=self.conn.session.timeout)
+            response = self.storage_session.put(
+                signed_file["signedUrl"],
+                data=file_ if os.path.getsize(path) else b"",
+                timeout=self.conn.session.timeout,
+            )
         response.raise_for_status()
         return signed_file["key"]

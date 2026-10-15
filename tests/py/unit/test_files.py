@@ -65,6 +65,14 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
         self.assertEqual(mock_put.call_args[0][0], SIGNED_URL)
 
     @mock.patch("requests.sessions.Session.put")
+    def test_put_empty_file(self, mock_put):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "a.txt")
+            open(path, "wb").close()
+            self.endpoints.put(path, FILE_NAME, SIGNED_URL)
+        self.assertEqual(mock_put.call_args[1]["data"], b"")
+
+    @mock.patch("requests.sessions.Session.put")
     @mock.patch("requests.sessions.Session.request")
     def test_put_refused(self, mock_request, mock_put):
         mock_request.return_value = self.mock_response(MOCK_SIGNED_URLS_RESPONSE)
