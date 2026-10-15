@@ -47,7 +47,7 @@ materials = client.materials.list()
 2. Install the commands:
 
    ```bash
-   pip install "git+https://github.com/mat3ra/api-client.git@e488bb8"
+   pip install "git+https://github.com/mat3ra/api-client.git@381d291"
    ```
 
 3. Sign in once, confirm the printed code in the browser where you are signed in to the platform:
@@ -75,7 +75,7 @@ materials = client.materials.list()
     set.json                 name, description, metadata of the measurement set
     <label>/
         measurement.json     name, description, status, setup, workflow, sample, metadata
-        properties/*.json    optional, one property document per file, any file names
+        properties/<property name>.json   optional, one property document per name
         files/...            optional, the measurement's files as delivered
 ```
 
