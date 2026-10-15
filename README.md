@@ -72,16 +72,16 @@ materials = client.materials.list()
 
 ```
 <folder>/
-    set.json                 name, description, metadata of the measurement set
-    <label>/
-        measurement.json     name, description, status, setup, workflow, sample, metadata
-        properties/<property name>.json   optional, one property document per name
-        files/...            optional, the measurement's files as delivered
+    set.json               name, description, metadata of the measurement set
+    <measurement>/         one folder per measurement, any name
+        measurement.json   name, description, status, setup, workflow, sample, properties, metadata
+        files/...          optional, the measurement's files as delivered
 ```
 
 - `setup` holds `instrument`, `session` and `settings` as the lab has them.
 - `sample` is `{name, description, metadata}`, or just the name; samples are matched by name.
-- A property file in `<label>/properties/` is accepted only for a property type the platform defines, listed in the
+- `properties` inside measurement.json is a list of property documents, accepted only for property types the platform
+  defines, listed in the
   [esse properties directory](https://github.com/mat3ra/esse/tree/dev/schema/properties_directory).
 - A result becomes a property only when the platform has a type for it; results of other kinds stay in the files.
   `metadata` is for context (positions, labels, session), never a result.

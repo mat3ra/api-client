@@ -84,6 +84,7 @@ def upload(new_client, sample_set_name, folder):
         measurement = json.loads(path.read_text())
         unit_id = measurement["workflow"]["subworkflows"][0]["units"][0]["flowchartId"]
         sample_entry = measurement.pop("sample")
+        property_documents = measurement.pop("properties", [])
         sample_config = {"name": sample_entry} if isinstance(sample_entry, str) else sample_entry
         sample, _ = find_or_create_in_set(client.samples, sample_config, run_sample_set["_id"], counts)
         config = {**measurement, "_sample": {"_id": sample["_id"]}}
@@ -100,8 +101,7 @@ def upload(new_client, sample_set_name, folder):
         if missing_files:
             signed_files = client.files.signed_urls(list(missing_files), "putObject")
             files_to_put += zip(missing_files.values(), missing_files, signed_files)
-        for property_path in sorted((path.parent / "properties").glob("*.json")):
-            property_document = json.loads(property_path.read_text())
+        for property_document in property_documents:
             query = {"source.info.origin._id": measurement_entity["_id"], "data.name": property_document["name"]}
             found = client.properties.list(query)
             counts["properties"]["already present" if found else "created"] += 1

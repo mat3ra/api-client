@@ -67,5 +67,12 @@
     },
     "sample": {
         "name": "sample-1"
-    }
+    },
+    "properties": [
+        {
+            "name": "pressure",
+            "units": "kbar",
+            "value": 1.0
+        }
+    ]
 }
