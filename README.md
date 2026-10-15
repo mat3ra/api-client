@@ -47,7 +47,7 @@ materials = client.materials.list()
 2. Install the commands:
 
    ```bash
-   pip install "git+https://github.com/mat3ra/api-client.git@381d291"
+   pip install "git+https://github.com/mat3ra/api-client.git@5b600e7"
    ```
 
 3. Sign in once, confirm the printed code in the browser where you are signed in to the platform:
