@@ -14,9 +14,10 @@ CREDENTIALS_FILE_PATH = os.path.join(os.path.expanduser("~"), ".mat3ra", "api_to
 
 
 def main():
-    """Signs in with the device login, mints an API token, and writes it to the file with its account and host."""
-    argparse.ArgumentParser(description=__doc__).parse_args()
-    environment = APIEnv.from_env()
+    """Signs in to `host` by device login, mints an API token, and writes it to the file with its account and host."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("host")
+    environment = APIEnv.model_validate({**os.environ, "API_HOST": parser.parse_args().host})
     token_data = authenticate_oidc(
         build_oidc_base_url(environment.host, environment.port, environment.secure),
         show_popup=lambda uri, code: print(f"Open {uri}, confirm code {code}"),
