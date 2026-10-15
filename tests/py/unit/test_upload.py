@@ -78,7 +78,7 @@ class UploadUnitTest(EndpointBaseUnitTest):
     def test_upload_puts_the_file_under_the_measurement(self):
         self.upload()
         self.client.files.put.assert_called_once_with(
-            self.folder / "files" / "measurement-1" / "a.txt",
+            self.folder / "measurement-1" / "files" / "a.txt",
             "measurements/measurement-id/a.txt",
             SIGNED_FILE,
         )

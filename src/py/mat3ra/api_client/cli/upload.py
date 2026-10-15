@@ -1,4 +1,4 @@
-"""Uploads a folder of measurements as one measurement set, with their samples, properties and files."""
+"""Uploads a folder with one subfolder per measurement as one measurement set, with samples, properties and files."""
 
 import argparse
 import json
@@ -59,7 +59,7 @@ def find_or_create_in_set(endpoint, config, set_id, counts):
 
 
 def upload(new_client, sample_set_name, folder):
-    """Uploads the folder, files WORKERS at a time with a client each, and returns per kind what was new and present."""
+    """Uploads each measurement subfolder, files WORKERS at a time, and returns per kind what was new and present."""
     client = new_client()
     sample_sets = client.samples.list({"isEntitySet": True, "name": sample_set_name})
     if len(sample_sets) != 1:
@@ -67,9 +67,7 @@ def upload(new_client, sample_set_name, folder):
             f'Found {len(sample_sets)} sample sets named "{sample_set_name}", expected one: create it in the web app.'
         )
     set_config = json.loads((folder / "set.json").read_text())
-    workflow = json.loads((folder / "workflow.json").read_text())
     set_query = {"isEntitySet": True, "name": set_config["name"]}
-    unit_id = workflow["subworkflows"][0]["units"][0]["flowchartId"]
     counts = defaultdict(Counter)
     files_to_put = []
 
@@ -82,14 +80,15 @@ def upload(new_client, sample_set_name, folder):
     counts["measurement sets"]["already present" if measurement_sets else "created"] += 1
     measurement_set = measurement_sets[0] if measurement_sets else client.measurements.create_set(set_config)
 
-    for path in sorted((folder / "measurements").glob("*.json")):
+    for path in sorted(folder.glob("*/measurement.json")):
         measurement = json.loads(path.read_text())
+        unit_id = measurement["workflow"]["subworkflows"][0]["units"][0]["flowchartId"]
         sample_entry = measurement.pop("sample")
         sample_config = {"name": sample_entry} if isinstance(sample_entry, str) else sample_entry
         sample, _ = find_or_create_in_set(client.samples, sample_config, run_sample_set["_id"], counts)
-        config = {**measurement, "_sample": {"_id": sample["_id"]}, "workflow": workflow}
+        config = {**measurement, "_sample": {"_id": sample["_id"]}}
         measurement_entity, created = find_or_create_in_set(client.measurements, config, measurement_set["_id"], counts)
-        files_folder = folder / "files" / path.stem
+        files_folder = path.parent / "files"
         stored_files = [] if created else client.measurements.list_files(measurement_entity["_id"])
         missing_files = {}
         for file_path in [file_path for file_path in files_folder.rglob("*") if file_path.is_file()]:
@@ -101,18 +100,18 @@ def upload(new_client, sample_set_name, folder):
         if missing_files:
             signed_files = client.files.signed_urls(list(missing_files), "putObject")
             files_to_put += zip(missing_files.values(), missing_files, signed_files)
-        property_path = folder / "properties" / path.name
-        if not property_path.exists():
-            continue
-        property_document = json.loads(property_path.read_text())
-        query = {"source.info.origin._id": measurement_entity["_id"], "data.name": property_document["name"]}
-        found = client.properties.list(query)
-        counts["properties"]["already present" if found else "created"] += 1
-        if not found:
-            origin = {"_id": measurement_entity["_id"], "cls": "Measurement"}
-            subject = {"_id": sample["_id"], "cls": "Sample"}
-            source = {"type": "external", "info": {"origin": origin, "subject": subject, "unitId": unit_id}}
-            client.properties.create({"data": property_document, "source": source, "exabyteId": [], "repetition": 0})
+        for property_path in sorted((path.parent / "properties").glob("*.json")):
+            property_document = json.loads(property_path.read_text())
+            query = {"source.info.origin._id": measurement_entity["_id"], "data.name": property_document["name"]}
+            found = client.properties.list(query)
+            counts["properties"]["already present" if found else "created"] += 1
+            if not found:
+                origin = {"_id": measurement_entity["_id"], "cls": "Measurement"}
+                subject = {"_id": sample["_id"], "cls": "Sample"}
+                source = {"type": "external", "info": {"origin": origin, "subject": subject, "unitId": unit_id}}
+                client.properties.create(
+                    {"data": property_document, "source": source, "exabyteId": [], "repetition": 0}
+                )
     worker = threading.local()
     with ThreadPoolExecutor(WORKERS, initializer=lambda: setattr(worker, "files", new_client().files)) as executor:
         list(executor.map(lambda file_to_put: put_file(worker.files, *file_to_put), files_to_put))
