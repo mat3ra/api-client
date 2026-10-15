@@ -47,7 +47,7 @@ materials = client.materials.list()
 2. Install the commands:
 
    ```bash
-   pip install "git+https://github.com/mat3ra/api-client.git@48a6937"
+   pip install "git+https://github.com/mat3ra/api-client.git@839f55b"
    ```
 
 3. Sign in once, then confirm the printed code in the browser:
@@ -66,7 +66,7 @@ materials = client.materials.list()
 
    The measurements go into a measurement set named as in `set.json`, their samples into a sample set of the same name
    inside the wafer's set. Running it again uploads only what is missing. Files go up 32 at a time (`WORKERS` in
-   `cli/upload.py`): under one CPU core and 100 MB; halve it on a weak machine.
+   `cli/upload.py`), at about half a CPU core and 100 MB of memory.
 
 ## The folder
 
