@@ -50,8 +50,19 @@ class EndpointFilesUnitTest(EndpointBaseUnitTest):
             json.loads(mock_request.call_args[1]["data"]), {"names": [FILE_NAME], "operation": "putObject"}
         )
         self.assertEqual(mock_put.call_args[0][0], SIGNED_URL)
-        self.assertEqual(mock_put.call_args[1]["data"], FILE_CONTENT)
+        self.assertEqual(mock_put.call_args[1]["data"].name, path)
         self.assertEqual(mock_put.call_args[1]["timeout"], self.endpoints.conn.session.timeout)
+
+    @mock.patch("requests.sessions.Session.put")
+    @mock.patch("requests.sessions.Session.request")
+    def test_put_to_signed_url(self, mock_request, mock_put):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "a.txt")
+            with open(path, "wb") as file_:
+                file_.write(FILE_CONTENT)
+            self.endpoints.put(path, FILE_NAME, SIGNED_URL)
+        mock_request.assert_not_called()
+        self.assertEqual(mock_put.call_args[0][0], SIGNED_URL)
 
     @mock.patch("requests.sessions.Session.put")
     @mock.patch("requests.sessions.Session.request")

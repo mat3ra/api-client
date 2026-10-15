@@ -17,6 +17,7 @@ MEASUREMENT_SET = {"_id": "measurement-set-id", "name": "set-1"}
 MEASUREMENT = {"_id": "measurement-id", "name": "measurement-1"}
 PROPERTY = {"_id": "property-id"}
 STORED_FILE = {"key": "account/measurements/measurement-id/a.txt"}
+SIGNED_URL = "https://storage/account/measurements/measurement-id/a.txt?signature"
 PROPERTY_SOURCE = {
     "type": "external",
     "info": {
@@ -46,6 +47,7 @@ class UploadUnitTest(EndpointBaseUnitTest):
         self.client.samples.create.return_value = SAMPLE
         self.client.measurements.create_set.return_value = MEASUREMENT_SET
         self.client.measurements.create.return_value = MEASUREMENT
+        self.client.files.signed_urls.return_value = [{"signedUrl": SIGNED_URL}]
 
     def upload(self, present=False):
         def found(record):
@@ -76,8 +78,18 @@ class UploadUnitTest(EndpointBaseUnitTest):
     def test_upload_puts_the_file_under_the_measurement(self):
         self.upload()
         self.client.files.put.assert_called_once_with(
-            self.folder / "files" / "measurement-1" / "a.txt", "measurements/measurement-id/a.txt"
+            self.folder / "files" / "measurement-1" / "a.txt",
+            "measurements/measurement-id/a.txt",
+            SIGNED_URL,
         )
+
+    def test_upload_signs_the_missing_files_once_per_measurement(self):
+        self.upload()
+        self.client.files.signed_urls.assert_called_once_with(["measurements/measurement-id/a.txt"], "putObject")
+
+    def test_upload_does_not_list_the_files_of_a_new_measurement(self):
+        self.upload()
+        self.client.measurements.list_files.assert_not_called()
 
     def test_upload_again_creates_and_puts_nothing(self):
         self.upload(present=True)

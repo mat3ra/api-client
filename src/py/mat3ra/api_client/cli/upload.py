@@ -18,6 +18,8 @@ from ..constants import ACCOUNT_ID_ENV_VAR, AUTH_TOKEN_ENV_VAR
 from ..models import APIEnv
 from .auth import CREDENTIALS_FILE_PATH
 
+WORKERS = 32
+
 
 def load_credentials():
     """
@@ -35,29 +37,29 @@ def load_credentials():
     return credentials[ACCOUNT_ID_ENV_VAR], credentials[AUTH_TOKEN_ENV_VAR], environment
 
 
-def put_file(files_endpoint, path, key):
+def put_file(files_endpoint, path, key, signed_url):
     """Puts the file, again after 2 s and 4 s when the network fails; any other error stops the run."""
     for pause_seconds in (2, 4):
         try:
-            return files_endpoint.put(path, key)
+            return files_endpoint.put(path, key, signed_url)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             time.sleep(pause_seconds)
-    return files_endpoint.put(path, key)
+    return files_endpoint.put(path, key, signed_url)
 
 
 def find_or_create_in_set(endpoint, config, set_id, counts):
-    """Returns the entity named as in `config` directly inside the set, creating it there when missing."""
+    """Returns the entity named as in `config` directly inside the set and whether it was missing and created there."""
     found = endpoint.list({"name": config["name"], "inSet._id": set_id})
     counts[endpoint.name]["already present" if found else "created"] += 1
     if found:
-        return found[0]
+        return found[0], False
     entity = endpoint.create(config)
     endpoint.move_to_set(entity["_id"], None, set_id)
-    return entity
+    return entity, True
 
 
 def upload(new_client, sample_set_name, folder):
-    """Uploads the folder, files eight at a time with a client each, and returns per kind what was new and present."""
+    """Uploads the folder, files WORKERS at a time with a client each, and returns per kind what was new and present."""
     client = new_client()
     sample_sets = client.samples.list({"isEntitySet": True, "name": sample_set_name})
     if len(sample_sets) != 1:
@@ -69,7 +71,7 @@ def upload(new_client, sample_set_name, folder):
     set_query = {"isEntitySet": True, "name": set_config["name"]}
     unit_id = workflow["subworkflows"][0]["units"][0]["flowchartId"]
     counts = defaultdict(Counter)
-    files_to_put = {}
+    files_to_put = []
 
     run_sample_sets = client.samples.list({**set_query, "inSet._id": sample_sets[0]["_id"]})
     counts["sample sets"]["already present" if run_sample_sets else "created"] += 1
@@ -84,17 +86,22 @@ def upload(new_client, sample_set_name, folder):
         measurement = json.loads(path.read_text())
         sample_entry = measurement.pop("sample")
         sample_config = {"name": sample_entry} if isinstance(sample_entry, str) else sample_entry
-        sample = find_or_create_in_set(client.samples, sample_config, run_sample_set["_id"], counts)
+        sample, _ = find_or_create_in_set(client.samples, sample_config, run_sample_set["_id"], counts)
         config = {**measurement, "_sample": {"_id": sample["_id"]}, "workflow": workflow}
-        measurement_entity = find_or_create_in_set(client.measurements, config, measurement_set["_id"], counts)
+        measurement_entity, created = find_or_create_in_set(client.measurements, config, measurement_set["_id"], counts)
         files_folder = folder / "files" / path.stem
-        stored_files = client.measurements.list_files(measurement_entity["_id"])
+        stored_files = [] if created else client.measurements.list_files(measurement_entity["_id"])
+        missing_files = {}
         for file_path in [file_path for file_path in files_folder.rglob("*") if file_path.is_file()]:
             key = f"measurements/{measurement_entity['_id']}/{file_path.relative_to(files_folder).as_posix()}"
             already_stored = any(stored_file["key"].endswith(f"/{key}") for stored_file in stored_files)
             counts["files"]["already present" if already_stored else "put"] += 1
             if not already_stored:
-                files_to_put[key] = file_path
+                missing_files[key] = file_path
+        if missing_files:
+            signed_files = client.files.signed_urls(list(missing_files), "putObject")
+            signed_urls = [signed_file["signedUrl"] for signed_file in signed_files]
+            files_to_put += zip(missing_files.values(), missing_files, signed_urls)
         property_path = folder / "properties" / path.name
         if not property_path.exists():
             continue
@@ -108,8 +115,8 @@ def upload(new_client, sample_set_name, folder):
             source = {"type": "external", "info": {"origin": origin, "subject": subject, "unitId": unit_id}}
             client.properties.create({"data": property_document, "source": source, "exabyteId": [], "repetition": 0})
     worker = threading.local()
-    with ThreadPoolExecutor(8, initializer=lambda: setattr(worker, "files", new_client().files)) as executor:
-        list(executor.map(lambda key, path: put_file(worker.files, path, key), files_to_put, files_to_put.values()))
+    with ThreadPoolExecutor(WORKERS, initializer=lambda: setattr(worker, "files", new_client().files)) as executor:
+        list(executor.map(lambda file_to_put: put_file(worker.files, *file_to_put), files_to_put))
     return counts
 
 

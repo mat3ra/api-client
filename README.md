@@ -65,7 +65,8 @@ materials = client.materials.list()
    ```
 
    The measurements go into a measurement set named as in `set.json`, their samples into a sample set of the same name
-   inside the wafer's set. Running it again uploads only what is missing.
+   inside the wafer's set. Running it again uploads only what is missing. Files go up 32 at a time (`WORKERS` in
+   `cli/upload.py`): under one CPU core and 100 MB; halve it on a weak machine.
 
 ## The folder
 
