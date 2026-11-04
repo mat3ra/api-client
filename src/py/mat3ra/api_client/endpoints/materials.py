@@ -6,6 +6,8 @@ from .mixins.default import DefaultableEntityEndpointsMixin
 from .mixins.set import EntitySetEndpointsMixin
 from ..utils.materials import get_materialsproject_url
 
+V1_MATERIALS_PATH = "/api/v1/materials"
+
 
 class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin, EntityEndpoint):
     """
@@ -28,6 +30,25 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(MaterialEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "materials"
+
+    def create(self, config, owner_id=None):
+        material = dict(config)
+        entity = super(MaterialEndpoints, self).create(config, owner_id)
+        self._store_constraints(entity, material)
+        return entity
+
+    def update(self, id_, modifier, parameters=None):
+        entity = super(MaterialEndpoints, self).update(id_, modifier, parameters)
+        self._store_constraints(entity, modifier)
+        return entity
+
+    def _store_constraints(self, entity, material):
+        constraints = material.get("basis", {}).get("constraints")
+        if not constraints:
+            return
+        data = {"accountId": entity["owner"]["_id"], "material": material, "constraints": constraints}
+        path = "/".join((V1_MATERIALS_PATH, entity["_id"]))
+        self.conn.request("PUT", path, data=json.dumps(data), headers=self.headers)
 
     def import_from_file(self, name, content, owner_id=None, format="poscar", tags=()):
         """
