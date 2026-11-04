@@ -70,5 +70,5 @@ class EndpointMaterialsUnitTest(EntityEndpointsUnitTest):
     @mock.patch("requests.sessions.Session.request")
     def test_save_raises_on_rejected_constraints(self, mock_request):
         mock_request.side_effect = [self.mock_response(MATERIAL_RESPONSE), self.mock_response(V1_ERROR_RESPONSE)]
-        with self.assertRaises(BaseException):
+        with self.assertRaisesRegex(BaseException, "NOT_AUTHORIZED"):
             self.endpoints.create(json.loads(json.dumps(CONSTRAINED_MATERIAL)), owner_id=OWNER_ID)
