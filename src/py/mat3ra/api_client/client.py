@@ -8,6 +8,7 @@ from .constants import _build_base_url
 from .endpoints.bank_materials import BankMaterialEndpoints
 from .endpoints.bank_workflows import BankWorkflowEndpoints
 from .endpoints.clusters import ClustersEndpoint
+from .endpoints.files import FileEndpoints
 from .endpoints.jobs import JobEndpoints
 from .endpoints.materials import MaterialEndpoints
 from .endpoints.metaproperties import MetaPropertiesEndpoints
@@ -60,14 +61,15 @@ class APIClient(BaseModel):
         self.bank_materials = BankMaterialEndpoints(*base_args, **base_kwargs)
         self.bank_workflows = BankWorkflowEndpoints(*base_args, **base_kwargs)
         self.clusters = ClustersEndpoint(*base_args, **base_kwargs)
+        self.files = FileEndpoints(*base_args, **base_kwargs)
 
     @staticmethod
     def _resolve_config(
-            host: Optional[str],
-            port: Optional[int],
-            version: Optional[str],
-            secure: Optional[bool],
-            env: APIEnv,
+        host: Optional[str],
+        port: Optional[int],
+        version: Optional[str],
+        secure: Optional[bool],
+        env: APIEnv,
     ) -> Tuple[str, int, str, bool]:
         return (
             host if host is not None else env.host,
@@ -78,11 +80,11 @@ class APIClient(BaseModel):
 
     @classmethod
     def _auth_from_env(
-            cls,
-            *,
-            access_token: Optional[str],
-            account_id: Optional[str],
-            auth_token: Optional[str],
+        cls,
+        *,
+        access_token: Optional[str],
+        account_id: Optional[str],
+        auth_token: Optional[str],
     ) -> AuthContext:
         env = cls.auth_env()
         return AuthContext(
@@ -101,16 +103,16 @@ class APIClient(BaseModel):
 
     @classmethod
     def authenticate(
-            cls,
-            *,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            version: Optional[str] = None,
-            secure: Optional[bool] = None,
-            access_token: Optional[str] = None,
-            account_id: Optional[str] = None,
-            auth_token: Optional[str] = None,
-            timeout_seconds: int = 60,
+        cls,
+        *,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        version: Optional[str] = None,
+        secure: Optional[bool] = None,
+        access_token: Optional[str] = None,
+        account_id: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        timeout_seconds: int = 60,
     ) -> "APIClient":
         host_value, port_value, version_value, secure_value = cls._resolve_config(
             host, port, version, secure, cls.env()
@@ -170,8 +172,9 @@ class APIClient(BaseModel):
 
     def get_default_organization(self) -> Optional[Account]:
         accounts = self._fetch_user_accounts()
-        organizations = [account for account in accounts if
-                         account["entity"].get("type") in ("organization", "enterprise")]
+        organizations = [
+            account for account in accounts if account["entity"].get("type") in ("organization", "enterprise")
+        ]
 
         if not organizations:
             return None
