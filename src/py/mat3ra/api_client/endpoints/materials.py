@@ -32,12 +32,14 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
         self.name = "materials"
 
     def create(self, config, owner_id=None):
+        """Creates the material; a non-empty basis.constraints is also stored through PUT /api/v1/materials/{id}."""
         material = dict(config)
         entity = super(MaterialEndpoints, self).create(config, owner_id)
         self._store_constraints(entity, material)
         return entity
 
     def update(self, id_, modifier, parameters=None):
+        """Updates the material; a non-empty basis.constraints is also stored through PUT /api/v1/materials/{id}."""
         entity = super(MaterialEndpoints, self).update(id_, modifier, parameters)
         self._store_constraints(entity, modifier)
         return entity
@@ -48,7 +50,11 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
             return
         data = {"accountId": entity["owner"]["_id"], "material": material, "constraints": constraints}
         path = "/".join((V1_MATERIALS_PATH, entity["_id"]))
-        self.conn.request("PUT", path, data=json.dumps(data), headers=self.headers)
+        headers = {**self.headers, **self.auth.get_headers()} if self.auth else self.headers
+        self.conn.request("PUT", path, data=json.dumps(data), headers=headers)
+        response = self.conn.json()
+        if response["status"] != 1:
+            raise BaseException(response["error"])
 
     def import_from_file(self, name, content, owner_id=None, format="poscar", tags=()):
         """
