@@ -8,6 +8,7 @@ from .constants import ACCESS_TOKEN_ENV_VAR, CLIENT_ID, SCOPE, build_oidc_base_u
 from .models import Account, APIEnv, AuthContext, AuthEnv
 from .endpoints.bank_materials import BankMaterialEndpoints
 from .endpoints.bank_workflows import BankWorkflowEndpoints
+from .endpoints.files import FileEndpoints
 from .endpoints.jobs import JobEndpoints
 from .endpoints.login import LoginEndpoint
 from .endpoints.logout import LogoutEndpoint
