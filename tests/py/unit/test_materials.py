@@ -65,7 +65,7 @@ class EndpointMaterialsUnitTest(EntityEndpointsUnitTest):
     @mock.patch("requests.sessions.Session.request")
     def test_create_without_constraints_omits_them(self, mock_request):
         mock_request.side_effect = self.v1_response
-        self.endpoints.create({"name": "material"}, owner_id=OWNER_ID)
+        self.endpoints.create({"name": "material"})
         self.assertNotIn("constraints", json.loads(mock_request.call_args_list[0][1]["data"]))
 
     @mock.patch("requests.sessions.Session.request")

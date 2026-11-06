@@ -57,7 +57,9 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
         """
         material = self.get(self._save("POST", self.name, config)["id"])
         if owner_id and material["owner"]["_id"] != owner_id:
-            raise BaseException(f"Material created under account {material['owner']['_id']}, not {owner_id}")
+            raise BaseException(
+                f"Material {material['_id']} created under account {material['owner']['_id']}, not {owner_id}"
+            )
         return material
 
     def update(self, id_, modifier, parameters=None):
@@ -90,7 +92,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
             response = self._v1_conn.json()
             if response["status"] != 1:
                 error = response["error"]
-                raise BaseException(error["message"] or error["code"])
+                raise BaseException(error["message"] or f"{error['code']} {error.get('fields', '')}")
             return response["data"]
 
     def import_from_file(self, name, content, owner_id=None, format="poscar", tags=()):
