@@ -1,12 +1,10 @@
 import json
 from .entity import EntityEndpoint
-from .enums import DEFAULT_API_VERSION, SECURE
+from .enums import DEFAULT_API_VERSION, SECURE, V1_API_VERSION
 from ..utils.http import BaseConnection, Connection
 from .mixins.default import DefaultableEntityEndpointsMixin
 from .mixins.set import EntitySetEndpointsMixin
 from ..utils.materials import get_materialsproject_url
-
-V1_API_VERSION = "v1"
 
 
 class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin, EntityEndpoint):
@@ -31,8 +29,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(MaterialEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "materials"
-        self.account_id = account_id
-        self.v1_conn = Connection(host, port, version=V1_API_VERSION, secure=secure, **kwargs)
+        self._v1_conn = Connection(host, port, version=V1_API_VERSION, secure=secure, **kwargs)
 
     def get(self, id_):
         """
@@ -52,13 +49,16 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
 
         Args:
             config (dict): material config.
-            owner_id (str): owner ID. Material is created under the client's account if not specified.
+            owner_id (str): owner ID the new material is expected to have. The v1 route creates it
+                under the account the client is authenticated with, so another owner raises.
 
         Returns:
              dict: new material, as stored.
         """
-        account_id = owner_id or (self.auth.account_id if self.auth else None) or self.account_id
-        return self.get(self._save("POST", self.name, config, account_id)["id"])
+        material = self.get(self._save("POST", self.name, config)["id"])
+        if owner_id and material["owner"]["_id"] != owner_id:
+            raise BaseException(f"Material created under account {material['owner']['_id']}, not {owner_id}")
+        return material
 
     def update(self, id_, modifier, parameters=None):
         """
@@ -72,11 +72,11 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
         Returns:
              dict: updated material, as stored.
         """
-        self._save("PUT", "/".join((self.name, id_)), modifier, self.get(id_)["owner"]["_id"])
+        self._save("PUT", "/".join((self.name, id_)), modifier)
         return self.get(id_)
 
-    def _save(self, method, endpoint_path, material, account_id):
-        data = {"accountId": account_id, "material": material}
+    def _save(self, method, endpoint_path, material):
+        data = {"material": material}
         constraints = material.get("basis", {}).get("constraints")
         if constraints:
             data["constraints"] = constraints
@@ -85,11 +85,12 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
     def _v1_request(self, method, endpoint_path, data=None):
         """Sends a request to the v1 API, which reports a failure as a 200 response with status 0."""
         headers = {**self.headers, **self.auth.get_headers()} if self.auth else self.headers
-        with self.v1_conn:
-            self.v1_conn.request(method, endpoint_path, data=json.dumps(data) if data else None, headers=headers)
-            response = self.v1_conn.json()
+        with self._v1_conn:
+            self._v1_conn.request(method, endpoint_path, data=json.dumps(data) if data else None, headers=headers)
+            response = self._v1_conn.json()
             if response["status"] != 1:
-                raise BaseException(response["error"])
+                error = response["error"]
+                raise BaseException(error["message"] or error["code"])
             return response["data"]
 
     def import_from_file(self, name, content, owner_id=None, format="poscar", tags=()):
