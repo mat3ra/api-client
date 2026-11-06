@@ -1,17 +1,18 @@
 import json
 from .entity import EntityEndpoint
 from .enums import DEFAULT_API_VERSION, SECURE
-from ..utils.http import BaseConnection
+from ..utils.http import BaseConnection, Connection
 from .mixins.default import DefaultableEntityEndpointsMixin
 from .mixins.set import EntitySetEndpointsMixin
 from ..utils.materials import get_materialsproject_url
 
-V1_MATERIALS_PATH = "/api/v1/materials"
+V1_API_VERSION = "v1"
 
 
 class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin, EntityEndpoint):
     """
-    Material endpoints.
+    Material endpoints. `get`, `create` and `update` go to `/api/v1`, the only route that carries a
+    material's atomic constraints; the other methods stay on the given API version.
 
     Args:
         host (str): API hostname.
@@ -30,31 +31,66 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(MaterialEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "materials"
+        self.account_id = account_id
+        self.v1_conn = Connection(host, port, version=V1_API_VERSION, secure=secure, **kwargs)
+
+    def get(self, id_):
+        """
+        Returns the material with the given ID, with its atomic constraints on `basis.constraints`.
+
+        Args:
+            id_ (str): material ID.
+
+        Returns:
+             dict: material.
+        """
+        return self._v1_request("GET", "/".join((self.name, id_)))["entity"]
 
     def create(self, config, owner_id=None):
-        """Creates the material; a non-empty basis.constraints is also stored through PUT /api/v1/materials/{id}."""
-        material = dict(config)
-        entity = super(MaterialEndpoints, self).create(config, owner_id)
-        self._store_constraints(entity, material)
-        return entity
+        """
+        Creates a new material, storing a non-empty `basis.constraints` with it.
+
+        Args:
+            config (dict): material config.
+            owner_id (str): owner ID. Material is created under the client's account if not specified.
+
+        Returns:
+             dict: new material, as stored.
+        """
+        account_id = owner_id or (self.auth.account_id if self.auth else None) or self.account_id
+        return self.get(self._save("POST", self.name, config, account_id)["id"])
 
     def update(self, id_, modifier, parameters=None):
-        """Updates the material; a non-empty basis.constraints is also stored through PUT /api/v1/materials/{id}."""
-        entity = super(MaterialEndpoints, self).update(id_, modifier, parameters)
-        self._store_constraints(entity, modifier)
-        return entity
+        """
+        Updates the material with the given ID, storing a non-empty `basis.constraints` with it.
 
-    def _store_constraints(self, entity, material):
+        Args:
+            id_ (str): material ID.
+            modifier (dict): a dictionary of key-values to update the material with.
+            parameters (dict): unused; the v1 route takes no request parameters.
+
+        Returns:
+             dict: updated material, as stored.
+        """
+        self._save("PUT", "/".join((self.name, id_)), modifier, self.get(id_)["owner"]["_id"])
+        return self.get(id_)
+
+    def _save(self, method, endpoint_path, material, account_id):
+        data = {"accountId": account_id, "material": material}
         constraints = material.get("basis", {}).get("constraints")
-        if not constraints:
-            return
-        data = {"accountId": entity["owner"]["_id"], "material": material, "constraints": constraints}
-        path = "/".join((V1_MATERIALS_PATH, entity["_id"]))
+        if constraints:
+            data["constraints"] = constraints
+        return self._v1_request(method, endpoint_path, data)
+
+    def _v1_request(self, method, endpoint_path, data=None):
+        """Sends a request to the v1 API, which reports a failure as a 200 response with status 0."""
         headers = {**self.headers, **self.auth.get_headers()} if self.auth else self.headers
-        self.conn.request("PUT", path, data=json.dumps(data), headers=headers)
-        response = self.conn.json()
-        if response["status"] != 1:
-            raise BaseException(response["error"])
+        with self.v1_conn:
+            self.v1_conn.request(method, endpoint_path, data=json.dumps(data) if data else None, headers=headers)
+            response = self.v1_conn.json()
+            if response["status"] != 1:
+                raise BaseException(response["error"])
+            return response["data"]
 
     def import_from_file(self, name, content, owner_id=None, format="poscar", tags=()):
         """
