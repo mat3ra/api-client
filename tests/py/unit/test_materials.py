@@ -16,7 +16,7 @@ V1_MATERIAL_URL = f"{V1_MATERIALS_URL}/{TEST_ENTITY_ID}"
 V1_GET_RESPONSE = json.dumps({"status": 1, "data": {"entity": STORED_MATERIAL, "bestProperties": []}})
 V1_SAVE_RESPONSE = json.dumps({"status": 1, "data": {"id": TEST_ENTITY_ID}})
 V1_ERROR_RESPONSE = json.dumps({"status": 0, "error": {"code": "NOT_AUTHORIZED", "message": ""}})
-SAVE_DATA = {"material": MATERIAL, "constraints": CONSTRAINTS}
+SAVE_DATA = {"material": MATERIAL}
 SAVE_BY_NAME = {
     "create": (lambda endpoints: endpoints.create(MATERIAL, owner_id=OWNER_ID), "post", V1_MATERIALS_URL),
     "update": (lambda endpoints: endpoints.update(TEST_ENTITY_ID, MATERIAL), "put", V1_MATERIAL_URL),
@@ -53,7 +53,7 @@ class EndpointMaterialsUnitTest(EntityEndpointsUnitTest):
         self.assertEqual(mock_request.call_args[1]["url"], V1_MATERIAL_URL)
 
     @mock.patch("requests.sessions.Session.request")
-    def test_save_sends_constraints_and_returns_the_stored_material(self, mock_request):
+    def test_save_sends_the_material_with_its_basis_and_returns_it_as_stored(self, mock_request):
         for save_name, (save, method, url) in SAVE_BY_NAME.items():
             with self.subTest(save=save_name):
                 mock_request.reset_mock()
@@ -61,12 +61,6 @@ class EndpointMaterialsUnitTest(EntityEndpointsUnitTest):
                 self.assertEqual(save(self.endpoints), STORED_MATERIAL)
                 write = next(call[1] for call in mock_request.call_args_list if call[1]["method"] == method)
                 self.assertEqual((write["url"], json.loads(write["data"])), (url, SAVE_DATA))
-
-    @mock.patch("requests.sessions.Session.request")
-    def test_create_without_constraints_omits_them(self, mock_request):
-        mock_request.side_effect = self.v1_response
-        self.endpoints.create({"name": "material"})
-        self.assertNotIn("constraints", json.loads(mock_request.call_args_list[0][1]["data"]))
 
     @mock.patch("requests.sessions.Session.request")
     def test_create_raises_when_the_material_lands_under_another_account(self, mock_request):

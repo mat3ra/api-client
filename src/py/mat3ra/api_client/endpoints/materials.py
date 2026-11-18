@@ -9,8 +9,8 @@ from ..utils.materials import get_materialsproject_url
 
 class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin, EntityEndpoint):
     """
-    Material endpoints. `get`, `create` and `update` go to `/api/v1`, the only route that carries a
-    material's atomic constraints; the other methods stay on the given API version.
+    Material endpoints. `get`, `create` and `update` go to `/api/v1`, the only route that carries a material's
+    per-atom properties; the other methods stay on the given API version.
 
     Args:
         host (str): API hostname.
@@ -33,7 +33,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
 
     def get(self, id_):
         """
-        Returns the material with the given ID, with its atomic constraints on `basis.constraints`.
+        Returns the material with the given ID, its per-atom properties on its basis.
 
         Args:
             id_ (str): material ID.
@@ -45,7 +45,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
 
     def create(self, config, owner_id=None):
         """
-        Creates a new material, storing a non-empty `basis.constraints` with it.
+        Creates a new material, storing its basis' per-atom properties with it.
 
         Args:
             config (dict): material config.
@@ -55,7 +55,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
         Returns:
              dict: new material, as stored.
         """
-        material = self.get(self._save("POST", self.name, config)["id"])
+        material = self.get(self._v1_request("POST", self.name, {"material": config})["id"])
         if owner_id and material["owner"]["_id"] != owner_id:
             raise BaseException(
                 f"Material {material['_id']} created under account {material['owner']['_id']}, not {owner_id}"
@@ -64,7 +64,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
 
     def update(self, id_, modifier, parameters=None):
         """
-        Updates the material with the given ID, storing a non-empty `basis.constraints` with it.
+        Updates the material with the given ID, storing its basis' per-atom properties with it.
 
         Args:
             id_ (str): material ID.
@@ -74,15 +74,8 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
         Returns:
              dict: updated material, as stored.
         """
-        self._save("PUT", "/".join((self.name, id_)), modifier)
+        self._v1_request("PUT", "/".join((self.name, id_)), {"material": modifier})
         return self.get(id_)
-
-    def _save(self, method, endpoint_path, material):
-        data = {"material": material}
-        constraints = material.get("basis", {}).get("constraints")
-        if constraints:
-            data["constraints"] = constraints
-        return self._v1_request(method, endpoint_path, data)
 
     def _v1_request(self, method, endpoint_path, data=None):
         """Sends a request to the v1 API, which reports a failure as a 200 response with status 0."""
