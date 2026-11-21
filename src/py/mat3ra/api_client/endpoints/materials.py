@@ -1,6 +1,6 @@
 import json
 from .entity import EntityEndpoint
-from .enums import DEFAULT_API_VERSION, SECURE, V1_API_VERSION
+from .enums import DEFAULT_API_VERSION, SECURE
 from ..utils.http import BaseConnection, Connection
 from .mixins.default import DefaultableEntityEndpointsMixin
 from .mixins.set import EntitySetEndpointsMixin
@@ -29,7 +29,7 @@ class MaterialEndpoints(EntitySetEndpointsMixin, DefaultableEntityEndpointsMixin
     def __init__(self, host, port, account_id, auth_token, version=DEFAULT_API_VERSION, secure=SECURE, **kwargs):
         super(MaterialEndpoints, self).__init__(host, port, account_id, auth_token, version, secure, **kwargs)
         self.name = "materials"
-        self._v1_conn = Connection(host, port, version=V1_API_VERSION, secure=secure, **kwargs)
+        self._v1_conn = Connection(host, port, version="v1", secure=secure, **kwargs)
 
     def get(self, id_):
         """
