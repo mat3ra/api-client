@@ -1,4 +1,3 @@
-import re
 import urllib.request
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -7,6 +6,7 @@ from mat3ra.ide.compute import Compute
 from mat3ra.jode import Job
 from mat3ra.made.material import Material
 from mat3ra.wode import Workflow
+from mat3ra.wode.workflows.workflow import get_kgrid_query
 
 MATERIALS_SET_ENTITY_CLASS = "Material"
 
@@ -138,32 +138,6 @@ def find_job_for_material(
         {"limit": 1},
     )
     return existing[0] if existing else None
-
-
-def get_kgrid_query(kgrid: Optional[List[int]], unit_name: str = "pw_scf") -> Dict[str, Any]:
-    """
-    `jobs.list` condition for jobs whose `unit_name` unit ran on `kgrid` (empty when `kgrid` is None), matched where
-    `apply_scf_kgrid` sets it: `workflow.subworkflows[].units[name].context[name="kgrid"].data.dimensions`.
-    A job created without an explicit k-grid has no such context and never matches.
-    """
-    if kgrid is None:
-        return {}
-    kgrid_context = {"$elemMatch": {"name": "kgrid", "data.dimensions": list(kgrid)}}
-    return {"workflow.subworkflows.units": {"$elemMatch": {"name": unit_name, "context": kgrid_context}}}
-
-
-def get_kgrid_of_job(job: Dict[str, Any], unit_name: str = "pw_scf") -> Optional[List[int]]:
-    """
-    K-grid dimensions the job's `unit_name` unit ran on: its `kgrid` context, or, for a job created without one, the
-    grid the platform rendered into the unit's input, `workflow.subworkflows[].units[name].input[0].rendered`.
-    """
-    units = [unit for subworkflow in job["workflow"]["subworkflows"] for unit in subworkflow["units"]]
-    unit = next(unit for unit in units if unit["name"] == unit_name)
-    kgrid_context = next((item for item in unit["context"] if item["name"] == "kgrid"), None)
-    if kgrid_context:
-        return kgrid_context["data"]["dimensions"]
-    match = re.search(r"K_POINTS automatic\s+(\d+)\s+(\d+)\s+(\d+)", unit["input"][0]["rendered"])
-    return [int(dimension) for dimension in match.groups()] if match else None
 
 
 def find_job_for_material_with_property(

@@ -4,9 +4,9 @@ from typing import Any, Dict, List, Optional
 from mat3ra.api_client import APIClient
 from mat3ra.made.material import Material
 from mat3ra.prode import PropertyName
+from mat3ra.wode.workflows.workflow import get_kgrid_query
 
-from .job import get_kgrid_query
-from .property import get_properties_for_job
+from ..property import get_properties_for_job
 
 ORDERED_ENTITY_SET_TYPE = "ordered"
 UNORDERED_ENTITY_SET_TYPE = "unordered"

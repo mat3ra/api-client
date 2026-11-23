@@ -14,7 +14,7 @@ CLOUD_FILE: Dict[str, Any] = {
 
 def test_object_storage_input_carries_every_field_the_runner_needs():
     """rupy requires all of NAME/PROVIDER/CONTAINER/REGION plus a basename, with no defaults."""
-    assert to_object_storage_input(CLOUD_FILE) == {
+    assert to_object_storage_input(CLOUD_FILE).model_dump(exclude_none=True) == {
         "type": "object_storage",
         "basename": "user_script.py",
         "pathname": "",
@@ -30,4 +30,4 @@ def test_object_storage_input_carries_every_field_the_runner_needs():
 def test_object_storage_basename_is_the_name_the_script_opens():
     nested = {**CLOUD_FILE, "key": "my-account/assets/radii.json"}
 
-    assert to_object_storage_input(nested)["basename"] == "radii.json"
+    assert to_object_storage_input(nested).basename == "radii.json"
