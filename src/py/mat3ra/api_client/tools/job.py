@@ -1,8 +1,11 @@
 import re
 import urllib.request
-from typing import Any, Dict, Iterable, List, Optional, Union
+from functools import wraps
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 from mat3ra.api_client import APIClient, JobEndpoints
+from mat3ra.made.material import Material
+from mat3ra.wode import Workflow
 
 MATERIALS_SET_ENTITY_CLASS = "Material"
 
@@ -214,3 +217,51 @@ def submit_jobs(endpoint: JobEndpoints, job_ids: List[str]) -> None:
     """
     for job_id in job_ids:
         endpoint.submit(job_id)
+
+
+# TODO: place to mat3ra-made
+def convert_material_args(fn: Callable) -> Callable:
+    """Converts any Material or List[Material] arg/kwarg to dict(s)."""
+
+    @wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def convert(v: Any) -> Any:
+            if Material is not None and isinstance(v, Material):
+                return v.to_dict()
+            if isinstance(v, list):
+                return [i.to_dict() if (Material is not None and isinstance(i, Material)) else i for i in v]
+            return v
+
+        return fn(*[convert(a) for a in args], **{k: convert(v) for k, v in kwargs.items()})
+
+    return wrapper
+
+
+# TODO: place to mat3ra-wode
+def convert_workflow_args(fn: Callable) -> Callable:
+    """Converts any Workflow arg/kwarg to a dict."""
+
+    @wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        convert = lambda v: v.to_dict() if (Workflow is not None and isinstance(v, Workflow)) else v  # noqa: E731
+        return fn(*[convert(a) for a in args], **{k: convert(v) for k, v in kwargs.items()})
+
+    return wrapper
+
+
+def get_convergence_series(client: APIClient, job_id: str, subworkflow_index: int = 0) -> List[dict]:
+    """
+    Returns the convergence series from a finished convergence job.
+
+    Args:
+        client: API client instance.
+        job_id: ID of the finished convergence job.
+        subworkflow_index: Index of the convergence subworkflow (default 0).
+
+    Returns:
+        List of dicts with keys "x", "parameter", "y".
+    """
+    finished_job = client.jobs.get(job_id)
+    job_workflow = Workflow.create(finished_job["workflow"])
+    subworkflow = job_workflow.subworkflows[subworkflow_index]
+    return subworkflow.convergence_series(finished_job.get("scopeTrack"))
