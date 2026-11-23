@@ -96,7 +96,7 @@ def get_or_create_materials_set(
     api_client: APIClient,
     owner_id: str,
     material_set_name: str,
-    materials: List[Any],
+    materials: List[Material],
     is_ordered: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -110,7 +110,7 @@ def get_or_create_materials_set(
         api_client (APIClient): API client instance carrying the authorization context.
         owner_id (str): Account ID under which to find or create the set.
         material_set_name (str): Name of the set to reuse or create.
-        materials (list): Members to include (dict responses or Made objects with `.id`).
+        materials (List[Material]): Members to include, saved on the platform (with `.id`).
         is_ordered (bool): Whether path order (`inSet.index`) matters for this set.
 
     Returns:
@@ -146,12 +146,11 @@ def get_or_create_materials_set(
         print(f"♻️  Reusing materials set '{materials_set['name']}' ({existing_type}, {materials_set['_id']})")
 
     for material in materials:
-        identifier = material["_id"] if isinstance(material, dict) else material.id
-        api_client.materials.move_to_set(identifier, "", materials_set["_id"])
+        api_client.materials.move_to_set(material.id, "", materials_set["_id"])
     return materials_set
 
 
-def get_or_create_material(api_client: APIClient, material, owner_id: str) -> dict:
+def get_or_create_material(api_client: APIClient, material: Material, owner_id: str) -> dict:
     """
     Returns an existing material from the collection if one with the same structural hash
     exists under the given owner, otherwise creates a new one.
@@ -182,7 +181,11 @@ def get_final_structure_for_job(api_client: APIClient, job_id: str) -> Material:
 
 
 def find_relaxed_material(
-    api_client: APIClient, material, owner_id: str, kgrid: Optional[List[int]] = None, unit_name: str = "pw_scf"
+    api_client: APIClient,
+    material: Material,
+    owner_id: str,
+    kgrid: Optional[List[int]] = None,
+    unit_name: str = "pw_scf",
 ) -> Optional[Material]:
     """
     Finds a relaxed version of a material: the final structure of a finished job on a material

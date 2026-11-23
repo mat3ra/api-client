@@ -13,6 +13,7 @@ from mat3ra.api_client.tools.material import (
     list_materials_by_set,
     list_materials_in_set,
 )
+from mat3ra.made.material import Material, defaultMaterialConfig
 from mat3ra.standata.materials import Materials
 
 OWNER_ID = "account-1"
@@ -49,6 +50,9 @@ SET_MEMBER_MATERIALS_OUT_OF_ORDER: List[Dict[str, Any]] = [
     MATERIAL_INITIAL,
     MATERIAL_IMAGE,
     ENTITY_SET,
+]
+MATERIALS: List[Material] = [
+    Material.create({**defaultMaterialConfig, **document}) for document in (MATERIAL_INITIAL, MATERIAL_FINAL)
 ]
 EXPECTED_ORDERED_IDS = ["m-initial", "m-image", "m-final"]
 EXPECTED_SINGLE_MEMBER_IDS = ["m-initial"]
@@ -133,8 +137,8 @@ def test_list_materials_by_set_orders_by_inset_index(members, expected_ids):
 @pytest.mark.parametrize(
     ("is_ordered", "expected_entity_set_type", "materials"),
     [
-        (True, "ordered", [MATERIAL_INITIAL, MATERIAL_FINAL]),
-        (False, "unordered", [MATERIAL_INITIAL]),
+        (True, "ordered", MATERIALS),
+        (False, "unordered", MATERIALS[:1]),
     ],
 )
 def test_get_or_create_materials_set_creates_when_missing(is_ordered, expected_entity_set_type, materials):
@@ -161,7 +165,7 @@ def test_get_or_create_materials_set_creates_when_missing(is_ordered, expected_e
         }
     )
     assert client.materials.move_to_set.call_args_list[0].args == (
-        materials[0]["_id"],
+        materials[0].id,
         "",
         MATERIAL_SET_ID,
     )
@@ -169,7 +173,7 @@ def test_get_or_create_materials_set_creates_when_missing(is_ordered, expected_e
 
 def test_get_or_create_materials_set_reuses_when_found():
     client = _client_with_list_responses([[ENTITY_SET]])
-    materials = [MATERIAL_INITIAL, MATERIAL_FINAL]
+    materials = MATERIALS
 
     materials_set = get_or_create_materials_set(
         client,
@@ -182,7 +186,7 @@ def test_get_or_create_materials_set_reuses_when_found():
     assert materials_set["_id"] == MATERIAL_SET_ID
     client.materials.create_set.assert_not_called()
     assert client.materials.move_to_set.call_args_list[0].args == (
-        materials[0]["_id"],
+        materials[0].id,
         "",
         MATERIAL_SET_ID,
     )
@@ -197,7 +201,7 @@ def test_get_or_create_materials_set_rejects_reuse_with_mismatched_type():
             client,
             OWNER_ID,
             MATERIAL_SET_NAME,
-            [MATERIAL_INITIAL, MATERIAL_FINAL],
+            MATERIALS,
             is_ordered=True,
         )
     client.materials.move_to_set.assert_not_called()
@@ -211,7 +215,7 @@ def test_get_or_create_materials_set_ordered_requires_two_materials():
             client,
             OWNER_ID,
             MATERIAL_SET_NAME,
-            [MATERIAL_INITIAL],
+            MATERIALS[:1],
             is_ordered=True,
         )
     client.materials.list.assert_not_called()
@@ -232,27 +236,15 @@ def test_get_or_create_materials_set_requires_one_material():
 
 
 DEFECTIVE_HASH = "hash-defective"
-
-
 RELAXED_HASH = "hash-relaxed"
-
-
 DEFECTIVE_MATERIAL = SimpleNamespace(hash=DEFECTIVE_HASH)
-
-
 SAVED_DEFECTIVE: Dict[str, Any] = {"_id": "m-defective", "name": "B-vacancy h-BN", "hash": DEFECTIVE_HASH}
-
-
 FINISHED_JOB: Dict[str, Any] = {"_id": "job-1", "name": "Fixed-cell Relaxation", "status": "finished"}
-
-
 RELAXED_MATERIAL_DOC: Dict[str, Any] = {
     **Materials.get_by_name_first_match("Silicon"),
     "name": "B-vacancy h-BN relaxed",
     "hash": RELAXED_HASH,
 }
-
-
 # Same hash as the input material: an SCF's own output, not a relaxation.
 SCF_MATERIAL_DOC: Dict[str, Any] = {
     **Materials.get_by_name_first_match("Silicon"),
@@ -375,8 +367,6 @@ def test_find_relaxed_material_matches_the_relaxation_kgrid():
 
 
 JOB_ID = "job-1"
-
-
 FINAL_STRUCTURE_MATERIAL_ID = "m-final-structure"
 
 

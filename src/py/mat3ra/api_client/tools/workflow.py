@@ -3,6 +3,7 @@ import re
 from typing import Dict, List, Optional
 
 from mat3ra.api_client import APIClient, BankWorkflowEndpoints
+from mat3ra.made.material import Material
 from mat3ra.wode import Workflow
 from mat3ra.wode.context.providers import PlanewaveCutoffsContextProvider, PointsGridDataProvider
 
@@ -71,7 +72,7 @@ def set_execution_unit_input(unit: dict, template_name: str, content: str) -> No
     raise KeyError(f"No input named '{template_name}' in unit '{unit.get('name')}'. Available: {available}")
 
 
-def get_or_create_workflow(api_client: APIClient, workflow: Workflow, owner_id: str) -> dict:
+def get_or_create_workflow(api_client: APIClient, workflow: Workflow, owner_id: str) -> Workflow:
     """
     Creates a workflow in the collection if none with the same hash exists under the given owner.
 
@@ -81,15 +82,15 @@ def get_or_create_workflow(api_client: APIClient, workflow: Workflow, owner_id: 
         owner_id (str): Account ID under which to search and create.
 
     Returns:
-        dict: The workflow dict (existing or newly created).
+        Workflow: The saved workflow (existing or newly created).
     """
     existing = api_client.workflows.list({"hash": workflow.hash, "owner._id": owner_id})
     if existing:
         print(f"♻️  Reusing already existing Workflow: {existing[0]['_id']}")
-        return existing[0]
+        return Workflow.create(existing[0])
     created = api_client.workflows.create(workflow.to_dict_without_special_keys(), owner_id=owner_id)
     print(f"✅ Workflow created: {created['_id']}")
-    return created
+    return Workflow.create(created)
 
 
 FORTRAN_NUMBER_PATTERN = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[de][+-]?\d+)?$", re.IGNORECASE)
@@ -150,7 +151,7 @@ def patch_workflow_qe_input(
     return workflow
 
 
-def kgrid_from_density(material, density: float, periodic_dims: tuple = (0, 1, 2)) -> List[int]:
+def kgrid_from_density(material: Material, density: float, periodic_dims: tuple = (0, 1, 2)) -> List[int]:
     """
     Returns a k-point grid sized to a reciprocal-space density (points per Å⁻¹) per periodic
     dimension, 1 elsewhere.
@@ -171,7 +172,12 @@ def kgrid_from_density(material, density: float, periodic_dims: tuple = (0, 1, 2
 
 
 def apply_scf_kgrid(
-    workflow: Workflow, scf_kgrid=None, *, material=None, unit_name: str = "pw_scf", first_only: bool = False
+    workflow: Workflow,
+    scf_kgrid=None,
+    *,
+    material: Optional[Material] = None,
+    unit_name: str = "pw_scf",
+    first_only: bool = False,
 ) -> Workflow:
     """
     Attaches an edited SCF k-grid context to units named `unit_name`.
