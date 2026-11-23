@@ -1,9 +1,10 @@
 import re
 import urllib.request
-from functools import wraps
-from typing import Any, Callable, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional
 
 from mat3ra.api_client import APIClient, JobEndpoints
+from mat3ra.ide.compute import Compute
+from mat3ra.jode import Job
 from mat3ra.made.material import Material
 from mat3ra.wode import Workflow
 
@@ -57,57 +58,48 @@ def _materials_set_reference(materials_set: Dict[str, Any]) -> Dict[str, str]:
 
 def create_job(
     api_client: APIClient,
-    materials: List[dict],
-    workflow: dict,
+    materials: List[Material],
+    workflow: Workflow,
     project_id: str,
     owner_id: str,
     prefix: str,
-    compute: Optional[dict] = None,
+    compute: Compute,
     materials_set: Optional[Dict[str, Any]] = None,
     tags: Optional[List[str]] = None,
-) -> Union[dict, List[dict]]:
+) -> Job:
     """
-    Creates jobs using pre-serialised material and workflow dicts.
+    Creates a job built by jode from the materials, the workflow and the compute.
 
     Args:
         api_client (APIClient): API client instance carrying the authorization context.
-        materials (list[dict]): Serialised material dicts.
-        workflow (dict): Serialised workflow dict.
+        materials (list[Material]): Saved materials, in the order the workflow takes them.
+        workflow (Workflow): Workflow of the job.
         project_id (str): Project ID.
         owner_id (str): Account ID.
         prefix (str): Job name prefix.
-        compute (dict, optional): Compute configuration dict.
+        compute (Compute): Compute configuration.
         materials_set (dict, optional): Ordered/unordered materials set document
             (same contract as the job designer `_materialsSet`).
         tags (list[str], optional): Job tags, e.g. ["charge:-1"].
 
     Returns:
-        dict | list[dict]: Created job(s).
+        Job: The created job.
     """
-    workflow.pop("_id", None)
-    is_multimaterial = workflow.get("isMultiMaterial", False)
-
-    config: dict = {
+    configuration: Dict[str, Any] = {
         "_project": {"_id": project_id},
-        "workflow": workflow,
         "owner": {"_id": owner_id},
         "name": prefix,
-        "_material": {"_id": materials[0]["_id"]},
+        "compute": compute.to_dict(),
     }
 
-    if is_multimaterial:
-        config["_materials"] = [{"_id": m["_id"]} for m in materials]
-
     if materials_set is not None:
-        config["_materialsSet"] = _materials_set_reference(materials_set)
-
-    if compute:
-        config["compute"] = compute
+        configuration["_materialsSet"] = _materials_set_reference(materials_set)
 
     if tags:
-        config["tags"] = list(tags)
+        configuration["tags"] = list(tags)
 
-    return api_client.jobs.create(config)
+    job = Job.create_from_workflow(workflow, materials, **configuration)
+    return Job(**api_client.jobs.create(job.to_dict()))
 
 
 def find_job_for_material(
@@ -217,36 +209,6 @@ def submit_jobs(endpoint: JobEndpoints, job_ids: List[str]) -> None:
     """
     for job_id in job_ids:
         endpoint.submit(job_id)
-
-
-# TODO: place to mat3ra-made
-def convert_material_args(fn: Callable) -> Callable:
-    """Converts any Material or List[Material] arg/kwarg to dict(s)."""
-
-    @wraps(fn)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        def convert(v: Any) -> Any:
-            if Material is not None and isinstance(v, Material):
-                return v.to_dict()
-            if isinstance(v, list):
-                return [i.to_dict() if (Material is not None and isinstance(i, Material)) else i for i in v]
-            return v
-
-        return fn(*[convert(a) for a in args], **{k: convert(v) for k, v in kwargs.items()})
-
-    return wrapper
-
-
-# TODO: place to mat3ra-wode
-def convert_workflow_args(fn: Callable) -> Callable:
-    """Converts any Workflow arg/kwarg to a dict."""
-
-    @wraps(fn)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        convert = lambda v: v.to_dict() if (Workflow is not None and isinstance(v, Workflow)) else v  # noqa: E731
-        return fn(*[convert(a) for a in args], **{k: convert(v) for k, v in kwargs.items()})
-
-    return wrapper
 
 
 def get_convergence_series(client: APIClient, job_id: str, subworkflow_index: int = 0) -> List[dict]:

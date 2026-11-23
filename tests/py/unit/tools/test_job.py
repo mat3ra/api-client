@@ -9,6 +9,12 @@ from mat3ra.api_client.tools.job import (
     get_kgrid_of_job,
     get_kgrid_query,
 )
+from mat3ra.ide.compute import Compute, QueueName
+from mat3ra.jode import Job
+from mat3ra.made.material import Material
+from mat3ra.standata.materials import Materials
+from mat3ra.standata.workflows import WorkflowStandata
+from mat3ra.wode import Workflow
 
 OWNER_ID = "account-1"
 PROJECT_ID = "project-1"
@@ -18,88 +24,67 @@ MATERIAL_SET_NAME = "H2+H"
 
 MATERIAL_INITIAL: Dict[str, Any] = {"_id": "m-initial", "name": "initial"}
 MATERIAL_FINAL: Dict[str, Any] = {"_id": "m-final", "name": "final"}
-MATERIALS: List[Dict[str, Any]] = [MATERIAL_INITIAL, MATERIAL_FINAL]
+SILICON: Dict[str, Any] = Materials.get_by_name_first_match("Silicon")
+MATERIALS: List[Material] = [
+    Material.create({**SILICON, **material}) for material in (MATERIAL_INITIAL, MATERIAL_FINAL)
+]
 
-MULTI_MATERIAL_WORKFLOW: Dict[str, Any] = {
-    "_id": "workflow-1",
-    "name": "NEB",
-    "isMultiMaterial": True,
-}
-SINGLE_MATERIAL_WORKFLOW: Dict[str, Any] = {
-    "_id": "workflow-2",
-    "name": "Total Energy",
-    "isMultiMaterial": False,
-}
+MULTI_MATERIAL_WORKFLOW = Workflow.create(WorkflowStandata.get_by_name_first_match("neb"))
+SINGLE_MATERIAL_WORKFLOW = Workflow.create(WorkflowStandata.get_by_name_first_match("total_energy"))
+COMPUTE = Compute(cluster={"fqdn": "cluster-001.mat3ra.com"}, queue=QueueName.D, ppn=2)
 MATERIALS_SET: Dict[str, Any] = {
     "_id": MATERIAL_SET_ID,
     "name": MATERIAL_SET_NAME,
     "slug": MATERIAL_SET_NAME,
     "isEntitySet": True,
 }
+MATERIALS_SET_REFERENCE: Dict[str, Any] = {"_id": MATERIAL_SET_ID, "cls": "Material", "slug": MATERIAL_SET_NAME}
 CREATED_JOB: Dict[str, Any] = {"_id": "job-1", "name": JOB_PREFIX}
 EXISTING_JOB: Dict[str, Any] = {"_id": "job-0", "name": "Fixed-cell Relaxation V_B pbe-us", "status": "finished"}
 RELAX_WORKFLOW_NAME = "Fixed-cell Relaxation V_B pbe-us"
 CHARGE_TAGS = ["charge:-1"]
 
 
-@pytest.mark.parametrize(
-    ("workflow", "materials_set", "expected_materials_set"),
-    [
-        (MULTI_MATERIAL_WORKFLOW, MATERIALS_SET, True),
-        (MULTI_MATERIAL_WORKFLOW, None, False),
-        (SINGLE_MATERIAL_WORKFLOW, MATERIALS_SET, True),
-    ],
-)
-def test_create_job_sets_materials_set_when_provided(workflow, materials_set, expected_materials_set):
+JOB_CONFIGURATION: Dict[str, Any] = {"_project": {"_id": PROJECT_ID}, "owner": {"_id": OWNER_ID}, "name": JOB_PREFIX}
+CREATE_JOB_CASES = [
+    {
+        "workflow": SINGLE_MATERIAL_WORKFLOW,
+        "materials_set": None,
+        "tags": CHARGE_TAGS,
+        "configuration": {**JOB_CONFIGURATION, "tags": CHARGE_TAGS},
+    },
+    {"workflow": MULTI_MATERIAL_WORKFLOW, "materials_set": None, "tags": None, "configuration": JOB_CONFIGURATION},
+    {
+        "workflow": MULTI_MATERIAL_WORKFLOW,
+        "materials_set": MATERIALS_SET,
+        "tags": None,
+        "configuration": {**JOB_CONFIGURATION, "_materialsSet": MATERIALS_SET_REFERENCE},
+    },
+]
+
+
+@pytest.mark.parametrize("case", CREATE_JOB_CASES)
+def test_create_job(case):
     client = MagicMock()
-    client.jobs.create.return_value = CREATED_JOB
-    workflow_payload = dict(workflow)
+    client.jobs.create.side_effect = lambda config: {**config, **CREATED_JOB}
 
     job = create_job(
-        api_client=client,
-        materials=MATERIALS,
-        workflow=workflow_payload,
-        project_id=PROJECT_ID,
-        owner_id=OWNER_ID,
-        prefix=JOB_PREFIX,
-        materials_set=materials_set,
+        client,
+        MATERIALS,
+        case["workflow"],
+        PROJECT_ID,
+        OWNER_ID,
+        JOB_PREFIX,
+        COMPUTE,
+        case["materials_set"],
+        case["tags"],
     )
 
-    assert job["_id"] == "job-1"
-    config = client.jobs.create.call_args.args[0]
-    assert "_id" not in workflow_payload
-    assert ("_materialsSet" in config) is expected_materials_set
-    if expected_materials_set:
-        assert config["_materialsSet"] == {
-            "_id": MATERIAL_SET_ID,
-            "cls": "Material",
-            "slug": MATERIAL_SET_NAME,
-        }
-    if workflow.get("isMultiMaterial"):
-        assert config["_materials"] == [{"_id": "m-initial"}, {"_id": "m-final"}]
-    else:
-        assert "_materials" not in config
-
-
-@pytest.mark.parametrize(
-    ("tags", "expected_tags"),
-    [(None, None), (CHARGE_TAGS, CHARGE_TAGS)],
-)
-def test_create_job_sets_tags_when_provided(tags, expected_tags):
-    client = MagicMock()
-    client.jobs.create.return_value = CREATED_JOB
-
-    create_job(
-        api_client=client,
-        materials=MATERIALS,
-        workflow=dict(SINGLE_MATERIAL_WORKFLOW),
-        project_id=PROJECT_ID,
-        owner_id=OWNER_ID,
-        prefix=JOB_PREFIX,
-        tags=tags,
+    expected_job = Job.create_from_workflow(
+        case["workflow"], MATERIALS, compute=COMPUTE.to_dict(), **case["configuration"]
     )
-
-    assert client.jobs.create.call_args.args[0].get("tags") == expected_tags
+    assert client.jobs.create.call_args.args[0] == expected_job.to_dict()
+    assert job.id == CREATED_JOB["_id"]
 
 
 @pytest.mark.parametrize(
