@@ -22,11 +22,11 @@ def save_files(job_id: str, job_endpoint: JobEndpoints, filename_on_cloud: str, 
         filename_on_disk (str): Name the file will be saved to
     """
     files = job_endpoint.list_files(job_id)
-    file_metadata = next(f for f in files if filename_on_cloud in f["key"])
+    file_metadata = next(file for file in files if filename_on_cloud in file["key"])
     signed_url = file_metadata["signedUrl"]
     server_response = urllib.request.urlopen(signed_url)
-    with open(filename_on_disk, "wb") as outp:
-        outp.write(server_response.read())
+    with open(filename_on_disk, "wb") as output_file:
+        output_file.write(server_response.read())
 
 
 def _materials_set_reference(materials_set: Dict[str, Any]) -> Dict[str, str]:

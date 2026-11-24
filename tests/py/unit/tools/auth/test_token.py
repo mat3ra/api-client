@@ -2,7 +2,7 @@ import contextlib
 from unittest.mock import MagicMock
 
 import pytest
-from mat3ra.api_client.tools.auth import request_token_data
+from mat3ra.api_client.tools.auth.token import request_token_data
 
 TOKEN_URL = "https://platform.mat3ra.com/oidc/token"
 TOKEN_DATA = {"access_token": "new-token", "expires_in": 3600}
