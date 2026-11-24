@@ -1,8 +1,9 @@
 import json
 from unittest import mock
 
+from mat3ra.api_client.endpoints import APIError
 from mat3ra.api_client.endpoints.jobs import JobEndpoints
-from tests.py.unit.entity import EntityEndpointsUnitTest
+from tests.py.unit.entity import TEST_ENTITY_ID, EntityEndpointsUnitTest
 
 ENDPOINT_NAME = "jobs"
 WORKFLOW = {"_id": "workflowId", "name": "Total Energy", "subworkflows": [{"name": "scf", "units": []}]}
@@ -34,6 +35,13 @@ class EndpointJobsUnitTest(EntityEndpointsUnitTest):
     def test_delete(self, mock_request):
         self.create(mock_request)
 
+    @mock.patch("requests.sessions.Session.request")
+    def test_error_status_raises_api_error(self, mock_request):
+        error_response = {"status": "error", "data": {"message": "Job not found"}}
+        mock_request.return_value = self.mock_response(json.dumps(error_response))
+        with self.assertRaisesRegex(APIError, "Job not found"):
+            self.endpoints.get(TEST_ENTITY_ID)
+
     def respond(self, mock_request, *data):
         responses = [json.dumps({"status": "success", "data": item}) for item in data]
         mock_request.side_effect = [self.mock_response(response) for response in responses]
@@ -47,7 +55,9 @@ class EndpointJobsUnitTest(EntityEndpointsUnitTest):
 
         fetch, create = mock_request.call_args_list
         self.assertEqual(fetch[1]["method"], "get")
-        self.assertEqual(fetch[1]["url"], f"https://{self.host}:{self.port}/api/{self.version}/workflows/{WORKFLOW['_id']}")
+        self.assertEqual(
+            fetch[1]["url"], f"https://{self.host}:{self.port}/api/{self.version}/workflows/{WORKFLOW['_id']}"
+        )
         self.assertEqual(create[1]["url"], f"{self.base_url}/create")
         self.assertEqual(json.loads(create[1]["data"]), {"name": "job", "workflow": WORKFLOW})
         self.assertEqual(config["workflow"], {"_id": WORKFLOW["_id"]})

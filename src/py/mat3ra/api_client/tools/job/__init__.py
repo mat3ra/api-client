@@ -1,0 +1,203 @@
+import urllib.request
+from typing import Any, Dict, Iterable, List, Optional
+
+from mat3ra.api_client import APIClient, JobEndpoints
+from mat3ra.ide.compute import Compute
+from mat3ra.jode import Job
+from mat3ra.made.material import Material
+from mat3ra.wode import Workflow
+from mat3ra.wode.workflows.workflow import get_kgrid_query
+
+MATERIALS_SET_ENTITY_CLASS = "Material"
+
+
+def save_files(job_id: str, job_endpoint: JobEndpoints, filename_on_cloud: str, filename_on_disk: str) -> None:
+    """
+    Saves a file to disk, overwriting any files with the same name as filename_on_disk.
+
+    Args:
+        job_id (str): ID of the job
+        job_endpoint (JobEndpoints): Job endpoint object from the Exabyte API Client
+        filename_on_cloud (str): Name of the file on the server
+        filename_on_disk (str): Name the file will be saved to
+    """
+    files = job_endpoint.list_files(job_id)
+    file_metadata = next(file for file in files if filename_on_cloud in file["key"])
+    signed_url = file_metadata["signedUrl"]
+    server_response = urllib.request.urlopen(signed_url)
+    with open(filename_on_disk, "wb") as output_file:
+        output_file.write(server_response.read())
+
+
+def _materials_set_reference(materials_set: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Builds the `_materialsSet` reference a job config expects.
+
+    Mirrors what the job designer sends: the set's ID, the entity class it holds,
+    and a slug. The platform resolves members from the ID, so `slug` is only a
+    label — falling back to `name` keeps it readable when the response omits it.
+
+    Args:
+        materials_set (dict): Materials set document.
+
+    Returns:
+        dict: The `_materialsSet` reference.
+
+    Raises:
+        KeyError: If the set document carries neither `slug` nor `name`.
+    """
+    slug = materials_set.get("slug") or materials_set.get("name")
+    if not slug:
+        raise KeyError(f"Materials set {materials_set['_id']} has neither 'slug' nor 'name'.")
+    return {
+        "_id": materials_set["_id"],
+        "cls": MATERIALS_SET_ENTITY_CLASS,
+        "slug": slug,
+    }
+
+
+def create_job(
+    api_client: APIClient,
+    materials: List[Material],
+    workflow: Workflow,
+    project_id: str,
+    owner_id: str,
+    prefix: str,
+    compute: Compute,
+    materials_set: Optional[Dict[str, Any]] = None,
+    tags: Optional[List[str]] = None,
+) -> Job:
+    """
+    Creates a job built by jode from the materials, the workflow and the compute.
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        materials (list[Material]): Saved materials, in the order the workflow takes them.
+        workflow (Workflow): Workflow of the job.
+        project_id (str): Project ID.
+        owner_id (str): Account ID.
+        prefix (str): Job name prefix.
+        compute (Compute): Compute configuration.
+        materials_set (dict, optional): Ordered/unordered materials set document
+            (same contract as the job designer `_materialsSet`).
+        tags (list[str], optional): Job tags, e.g. ["charge:-1"].
+
+    Returns:
+        Job: The created job.
+    """
+    configuration: Dict[str, Any] = {
+        "_project": {"_id": project_id},
+        "owner": {"_id": owner_id},
+        "name": prefix,
+        "compute": compute.to_dict(),
+    }
+
+    if materials_set is not None:
+        configuration["_materialsSet"] = _materials_set_reference(materials_set)
+
+    if tags:
+        configuration["tags"] = list(tags)
+
+    job = Job.create_from_workflow(workflow, materials, **configuration)
+    return Job(**api_client.jobs.create(job.to_dict()))
+
+
+def find_job_for_material(
+    api_client: APIClient,
+    material_id: str,
+    workflow_name: str,
+    owner_id: str,
+    statuses: Iterable[str] = ("finished",),
+    kgrid: Optional[List[int]] = None,
+    unit_name: str = "pw_scf",
+) -> Optional[dict]:
+    """
+    Finds a job for a material and workflow name under the given owner, filtered by status and,
+    optionally, by the k-grid its `unit_name` unit ran on.
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        material_id (str): The job's `_material._id`.
+        workflow_name (str): Exact workflow name the job was created with.
+        owner_id (str): Account ID the job must belong to.
+        statuses (Iterable[str]): Job statuses that count as a match.
+        kgrid (List[int], optional): Exact k-grid dimensions the job's `unit_name` unit ran on; None for no condition.
+        unit_name (str): Name of the unit the k-grid was set on.
+
+    Returns:
+        dict, optional: The matching job, or None if none exists.
+    """
+    existing = api_client.jobs.list(
+        {
+            "_material._id": material_id,
+            "owner._id": owner_id,
+            "workflow.name": workflow_name,
+            "status": {"$in": list(statuses)},
+            **get_kgrid_query(kgrid, unit_name),
+        },
+        {"limit": 1},
+    )
+    return existing[0] if existing else None
+
+
+def find_job_for_material_with_property(
+    api_client: APIClient,
+    material_id: str,
+    property_name: str,
+    owner_id: str,
+    tags: Optional[List[str]] = None,
+    kgrid: Optional[List[int]] = None,
+) -> Optional[dict]:
+    """
+    Finds a finished job on a material that reported the given property, optionally among the jobs
+    carrying every one of `tags` (e.g. ["charge:0"] for a reference computed in the neutral state)
+    and among those whose `pw_scf` unit ran on `kgrid`.
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        material_id (str): The job's `_material._id`.
+        property_name (str): Property the job must have reported, e.g. "total_energy".
+        owner_id (str): Account ID the job must belong to.
+        tags (List[str], optional): Tags the job must all carry.
+        kgrid (List[int], optional): Exact k-grid dimensions the job's `pw_scf` unit ran on; None for no condition.
+
+    Returns:
+        dict, optional: The first matching job, or None if none exists.
+    """
+    query: Dict[str, Any] = {"_material._id": material_id, "owner._id": owner_id, "status": "finished"}
+    if tags:
+        query["tags"] = {"$all": list(tags)}
+    jobs = api_client.jobs.list({**query, **get_kgrid_query(kgrid)})
+    return next(
+        (job for job in jobs if api_client.properties.get_for_job(job["_id"], property_name=property_name)), None
+    )
+
+
+def submit_jobs(endpoint: JobEndpoints, job_ids: List[str]) -> None:
+    """
+    Submits jobs by IDs.
+
+    Args:
+        endpoint (JobEndpoints): Job endpoint object from the Exabyte API Client.
+        job_ids (list[str]): Job IDs to submit.
+    """
+    for job_id in job_ids:
+        endpoint.submit(job_id)
+
+
+def get_convergence_series(client: APIClient, job_id: str, subworkflow_index: int = 0) -> List[dict]:
+    """
+    Returns the convergence series from a finished convergence job.
+
+    Args:
+        client: API client instance.
+        job_id: ID of the finished convergence job.
+        subworkflow_index: Index of the convergence subworkflow (default 0).
+
+    Returns:
+        List of dicts with keys "x", "parameter", "y".
+    """
+    finished_job = client.jobs.get(job_id)
+    job_workflow = Workflow.create(finished_job["workflow"])
+    subworkflow = job_workflow.subworkflows[subworkflow_index]
+    return subworkflow.convergence_series(finished_job.get("scopeTrack"))

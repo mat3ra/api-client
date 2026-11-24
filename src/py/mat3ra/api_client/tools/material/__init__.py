@@ -1,0 +1,217 @@
+import re
+from typing import Any, Dict, List, Optional
+
+from mat3ra.api_client import APIClient
+from mat3ra.made.material import Material
+from mat3ra.prode import PropertyName
+from mat3ra.wode.workflows.workflow import get_kgrid_query
+
+from ..property import get_properties_for_job
+
+ORDERED_ENTITY_SET_TYPE = "ordered"
+UNORDERED_ENTITY_SET_TYPE = "unordered"
+
+
+def _index_in_set(material: Dict[str, Any], material_set_id: str) -> float:
+    """
+    Path-order sort key. A member with no recorded index sorts last, so a
+    partially indexed set degrades to "known order first" instead of reshuffling.
+    """
+    for entry in material.get("inSet") or []:
+        if entry.get("_id") == material_set_id:
+            index = entry.get("index")
+            return float(index) if index is not None else float("inf")
+    return float("inf")
+
+
+def find_material_set(
+    api_client: APIClient,
+    owner_id: str,
+    material_set_name: str,
+    require_ordered: bool = False,
+) -> Dict[str, Any]:
+    """
+    Find a materials entity set by name (case-insensitive substring match).
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        owner_id (str): Account ID that owns the set.
+        material_set_name (str): Substring matched against set names under the owner.
+        require_ordered (bool): Reject the match unless it carries path order.
+
+    Returns:
+        dict: The first matching materials set document.
+
+    Raises:
+        ValueError: If no set matches, or if `require_ordered` and the match is unordered.
+    """
+    material_sets = api_client.materials.list(
+        {
+            "owner._id": owner_id,
+            "isEntitySet": True,
+            "name": {"$regex": re.escape(material_set_name), "$options": "i"},
+        }
+    )
+    if not material_sets:
+        raise ValueError(f"No material set matching '{material_set_name}'")
+    material_set = material_sets[0]
+
+    # Only an ordered set gets inSet.index values, so sorting an unordered one leaves
+    # every member tied — an arbitrary path, submitted without an error.
+    entity_set_type = material_set.get("entitySetType")
+    if require_ordered and entity_set_type != ORDERED_ENTITY_SET_TYPE:
+        raise ValueError(
+            f"Materials set '{material_set.get('name')}' is '{entity_set_type}', not "
+            f"'{ORDERED_ENTITY_SET_TYPE}'. Its members carry no path order."
+        )
+    return material_set
+
+
+def list_materials_in_set(api_client: APIClient, owner_id: str, material_set: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Members of an already-resolved set, ascending by `inSet.index`
+    (first -> optional intermediates -> last). Takes a resolved set so callers
+    that already have one do not re-query for it.
+    """
+    material_set_id = material_set["_id"]
+    matches = api_client.materials.list(
+        {"owner._id": owner_id, "inSet._id": material_set_id, "isEntitySet": {"$ne": True}}
+    )
+    members = [material for material in matches if not material.get("isEntitySet")]
+    return sorted(members, key=lambda material: _index_in_set(material, material_set_id))
+
+
+def list_materials_by_set(
+    api_client: APIClient,
+    owner_id: str,
+    material_set_name: str,
+    require_ordered: bool = False,
+) -> List[Dict[str, Any]]:
+    """Resolve a materials set by name and list its members in path order."""
+    material_set = find_material_set(api_client, owner_id, material_set_name, require_ordered=require_ordered)
+    return list_materials_in_set(api_client, owner_id, material_set)
+
+
+def get_or_create_materials_set(
+    api_client: APIClient,
+    owner_id: str,
+    material_set_name: str,
+    materials: List[Material],
+    is_ordered: bool = False,
+) -> Dict[str, Any]:
+    """
+    Reuse an existing materials set by name, or create one, then move members into it.
+
+    Members are moved one at a time in list order: the platform assigns `inSet.index`
+    in the order it receives them, which is what makes an ordered set's path order
+    match the caller's list.
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        owner_id (str): Account ID under which to find or create the set.
+        material_set_name (str): Name of the set to reuse or create.
+        materials (List[Material]): Members to include, saved on the platform (with `.id`).
+        is_ordered (bool): Whether path order (`inSet.index`) matters for this set.
+
+    Returns:
+        dict: The existing or newly created materials set document.
+
+    Raises:
+        ValueError: If materials are empty, if an ordered set has fewer than two members,
+            or if an existing set of that name has the opposite `entitySetType`.
+    """
+    if not materials:
+        raise ValueError("Materials set needs at least one material.")
+    if is_ordered and len(materials) < 2:
+        raise ValueError("Ordered materials set needs at least two materials.")
+
+    entity_set_type = ORDERED_ENTITY_SET_TYPE if is_ordered else UNORDERED_ENTITY_SET_TYPE
+    try:
+        materials_set: Optional[Dict[str, Any]] = find_material_set(api_client, owner_id, material_set_name)
+    except ValueError:
+        materials_set = None
+
+    if materials_set is None:
+        materials_set = api_client.materials.create_set(
+            {"name": material_set_name, "owner": {"_id": owner_id}, "entitySetType": entity_set_type}
+        )
+        print(f"✅ Materials set '{materials_set['name']}' ({entity_set_type}, {materials_set['_id']})")
+    else:
+        existing_type = materials_set.get("entitySetType")
+        if existing_type != entity_set_type:
+            raise ValueError(
+                f"Materials set '{materials_set['name']}' already exists as '{existing_type}', but "
+                f"'{entity_set_type}' was requested. Reusing it would silently drop path order."
+            )
+        print(f"♻️  Reusing materials set '{materials_set['name']}' ({existing_type}, {materials_set['_id']})")
+
+    for material in materials:
+        api_client.materials.move_to_set(material.id, "", materials_set["_id"])
+    return materials_set
+
+
+def get_or_create_material(api_client: APIClient, material: Material, owner_id: str) -> dict:
+    """
+    Returns an existing material from the collection if one with the same structural hash
+    exists under the given owner, otherwise creates a new one.
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        material: mat3ra-made Material object (must have a .hash property).
+        owner_id (str): Account ID under which to search and create.
+
+    Returns:
+        dict: The material dict (existing or newly created).
+    """
+    existing = api_client.materials.list({"hash": material.hash, "owner._id": owner_id})
+    if existing:
+        print(f"♻️  Reusing already existing Material: {existing[0]['_id']}")
+        return existing[0]
+    created = api_client.materials.create(material.to_dict(), owner_id=owner_id)
+    print(f"✅ Material created: {created['_id']}")
+    return created
+
+
+def get_final_structure_for_job(api_client: APIClient, job_id: str) -> Material:
+    """Fetch the relaxed structure a job reported as its `final_structure` property."""
+    properties = get_properties_for_job(api_client, job_id, PropertyName.non_scalar.final_structure.value)
+    if not properties:
+        raise RuntimeError(f"Job {job_id} reported no 'final_structure'")
+    return Material.create(api_client.materials.get(properties[-1]["materialId"]))
+
+
+def find_relaxed_material(
+    api_client: APIClient,
+    material: Material,
+    owner_id: str,
+    kgrid: Optional[List[int]] = None,
+    unit_name: str = "pw_scf",
+) -> Optional[Material]:
+    """
+    Finds a relaxed version of a material: the final structure of a finished job on a material
+    with the same structural hash, where the geometry has changed, optionally among the jobs whose
+    `unit_name` unit ran on `kgrid`.
+
+    Args:
+        api_client (APIClient): API client instance carrying the authorization context.
+        material: mat3ra-made Material object (must have a .hash property).
+        owner_id (str): Account ID under which to search.
+        kgrid (List[int], optional): Exact k-grid dimensions the relaxation ran on; None for no condition.
+        unit_name (str): Name of the relaxation unit, e.g. "pw_vc-relax".
+
+    Returns:
+        Material, optional: The relaxed structure, or None if none exists.
+    """
+    ids = [
+        existing_material["_id"]
+        for existing_material in api_client.materials.list({"hash": material.hash, "owner._id": owner_id})
+    ]
+    query = {"_material._id": {"$in": ids}, "owner._id": owner_id, "status": "finished"}
+    for job in api_client.jobs.list({**query, **get_kgrid_query(kgrid, unit_name)}):
+        properties = api_client.properties.get_for_job(job["_id"], PropertyName.non_scalar.final_structure.value)
+        if not properties:
+            continue
+        relaxed = api_client.materials.get(properties[-1]["materialId"])
+        if relaxed["hash"] != material.hash:
+            return Material.create(relaxed)
+    return None

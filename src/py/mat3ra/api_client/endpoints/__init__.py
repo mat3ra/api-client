@@ -4,6 +4,12 @@ from ..models import AuthContext
 from ..utils.http import Connection
 
 
+class APIError(Exception):
+    """
+    Error status of an API response.
+    """
+
+
 class BaseEndpoint(object):
     """
     Base class for Exabyte RESTful API endpoints.
@@ -42,7 +48,7 @@ class BaseEndpoint(object):
             self.conn.request(method, endpoint_path, params, data, headers)
             response = self.conn.json()
             if response["status"] != "success":
-                raise BaseException(response["data"]["message"])
+                raise APIError(response["data"]["message"])
             return response["data"]
 
     def get_headers(self, account_id, auth_token, content_type="application/json"):

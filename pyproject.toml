@@ -39,6 +39,14 @@ tests = [
     "pytest",
     "pytest-cov",
     "mock>=4.0.3",
+    "mat3ra-api-client[tools]",
+]
+tools = [
+    "mat3ra-ide",
+    "mat3ra-jode",
+    "mat3ra-made",
+    "mat3ra-prode",
+    "mat3ra-wode",
 ]
 all = [
     "mat3ra-api-client[tests]",
